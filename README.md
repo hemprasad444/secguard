@@ -66,7 +66,7 @@ SecGuard is an open-source, self-hosted security scanning platform that provides
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/secguard.git
+git clone https://github.com/hemprasad444/secguard.git
 cd secguard
 ```
 
@@ -84,7 +84,7 @@ Edit `.env` and change:
 3. **Start all services**
 
 ```bash
-docker compose up -d
+docker-compose up -d
 ```
 
 This will build and start all 7 containers. First run takes 5-10 minutes to build.
@@ -103,7 +103,7 @@ Open http://localhost:8080 and click "Sign Up" to create your first admin accoun
 Check all services are running:
 
 ```bash
-docker compose ps
+docker-compose ps
 ```
 
 You should see 7 containers running:
@@ -206,8 +206,8 @@ frontend:
 
 ```bash
 git pull
-docker compose build
-docker compose up -d
+docker-compose build
+docker-compose up -d
 ```
 
 Database migrations run automatically on startup.
@@ -216,41 +216,41 @@ Database migrations run automatically on startup.
 
 ```bash
 # Stop all services (keeps data)
-docker compose stop
+docker-compose stop
 
 # Stop and remove containers (keeps data volumes)
-docker compose down
+docker-compose down
 
 # Stop and remove everything including data
-docker compose down -v
+docker-compose down -v
 ```
 
 ## Troubleshooting
 
 ### Scan stuck in "pending"
 ```bash
-docker compose restart celery-worker
+docker-compose restart celery-worker
 ```
 
 ### Frontend not loading after update
 ```bash
-docker compose build frontend
-docker compose up -d frontend
+docker-compose build frontend
+docker-compose up -d frontend
 ```
 
 ### Redis read-only error
 ```bash
-docker compose exec redis redis-cli REPLICAOF NO ONE
+docker-compose exec redis redis-cli REPLICAOF NO ONE
 ```
 
 ### Check logs
 ```bash
 # All services
-docker compose logs -f
+docker-compose logs -f
 
 # Specific service
-docker compose logs backend --tail 50
-docker compose logs celery-worker --tail 50
+docker-compose logs backend --tail 50
+docker-compose logs celery-worker --tail 50
 ```
 
 ## Contributing
