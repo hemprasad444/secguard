@@ -1,0 +1,45 @@
+# Environment
+.env
+.env.local
+.env.production
+*.pyc
+__pycache__/
+.venv/
+venv/
+
+# Node
+node_modules/
+frontend/dist/
+.vite/
+
+# Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+celerybeat-schedule
+celerybeat-schedule.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads (keep directory, ignore contents)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Logs
+*.log
+
+# Claude Code
+.claude/
