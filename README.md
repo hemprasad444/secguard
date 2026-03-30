@@ -57,9 +57,39 @@ SecGuard is an open-source, self-hosted security scanning platform that provides
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (20.10+)
-- [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
+- **Git** - [Install Git](https://git-scm.com/downloads)
+- **Docker Engine** (20.10+) - [Install Docker](https://docs.docker.com/get-docker/)
+- **Docker Compose** - [Install Docker Compose](https://docs.docker.com/compose/install/)
 - 4GB+ RAM recommended
+
+#### Install Docker & Docker Compose (Ubuntu/Debian)
+
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Log out and back in for group to take effect
+
+# Install Docker Compose (if 'docker compose' or 'docker-compose' not found)
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Verify installation
+docker --version
+docker-compose --version
+```
+
+#### Install Docker & Docker Compose (macOS / Windows)
+
+Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) - it includes both Docker and Docker Compose.
+
+#### Verify Prerequisites
+
+```bash
+docker --version          # Should show Docker version 20.10+
+docker-compose --version  # Should show Docker Compose version
+git --version             # Should show git version
+```
 
 ### Installation
 
@@ -76,10 +106,12 @@ cd secguard
 cp .env.example .env
 ```
 
-Edit `.env` and change:
+For production, edit `.env` and change:
 - `SECRET_KEY` - Set a strong random key for JWT tokens
 - `POSTGRES_PASSWORD` - Set a secure database password
 - Update `DATABASE_URL` to match the password
+
+For local testing, defaults work fine - no changes needed.
 
 3. **Start all services**
 
@@ -87,12 +119,24 @@ Edit `.env` and change:
 docker-compose up -d
 ```
 
-This will build and start all 7 containers. First run takes 5-10 minutes to build.
+First run takes 5-10 minutes to download images and build containers. Wait for all services to be healthy:
+
+```bash
+docker-compose ps
+```
+
+All 7 containers should show `Up` or `Up (healthy)`.
+
+> **Note**: If you see a `502 Bad Gateway` error on first access, wait 30 seconds - the backend is still starting up. The frontend automatically waits for the backend to be ready, but on slower machines it may take a moment.
 
 4. **Access the application**
 
 - **Frontend**: http://localhost:8080
 - **Backend API**: http://localhost:8000/docs (Swagger UI)
+
+5. **Create your account**
+
+Open http://localhost:8080 and click **Sign Up** to create your organization and admin account.
 
 5. **Create your account**
 
