@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Shield,
   LayoutDashboard,
+  BarChart3,
   FolderGit2,
   Scan,
   Bug,
@@ -18,12 +19,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/',         label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/projects', label: 'Projects',  icon: FolderGit2 },
-  { to: '/scans',    label: 'Scans',     icon: Scan },
-  { to: '/findings', label: 'Findings',  icon: Bug },
-  { to: '/reports',  label: 'Reports',   icon: FileText },
-  { to: '/settings', label: 'Settings',  icon: Settings },
+  { to: '/',           label: 'Dashboard',  icon: LayoutDashboard },
+  { to: '/analytics',  label: 'Analytics',  icon: BarChart3 },
+  { to: '/projects',   label: 'Projects',   icon: FolderGit2 },
+  { to: '/scans',      label: 'Scans',      icon: Scan },
+  { to: '/findings',   label: 'Findings',   icon: Bug },
+  { to: '/reports',    label: 'Reports',    icon: FileText },
+  { to: '/settings',   label: 'Settings',   icon: Settings },
 ];
 
 export default function Sidebar() {

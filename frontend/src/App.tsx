@@ -4,6 +4,7 @@ import Layout from './components/layout/Layout';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Dashboard from './pages/Dashboard';
+import Dashboards from './pages/Dashboards';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import ScanDetail from './pages/ScanDetail';
@@ -37,6 +38,7 @@ export default function App() {
       <Route path="/signup" element={<SignUp />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
+        <Route path="analytics" element={<Dashboards />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="projects/:projectId/scans/:scanId" element={<ScanDetail />} />

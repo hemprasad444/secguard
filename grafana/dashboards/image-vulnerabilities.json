@@ -1,0 +1,115 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "red", "mode": "fixed"}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(DISTINCT f.cve_id) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND f.cve_id IS NOT NULL AND f.severity IN ('critical','high')", "refId": "A"}],
+      "title": "Critical + High CVEs",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND (f.raw_data->>'FixedVersion') IS NOT NULL AND (f.raw_data->>'FixedVersion') != ''", "refId": "A"}],
+      "title": "Fixable",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "gray", "mode": "fixed"}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND ((f.raw_data->>'FixedVersion') IS NULL OR (f.raw_data->>'FixedVersion') = '')", "refId": "A"}],
+      "title": "No Fix Available",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "purple", "mode": "fixed"}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(DISTINCT s.config_json->>'target') AS value FROM scans s WHERE s.config_json->>'scan_subtype' = 'dependency' AND s.status = 'completed'", "refId": "A"}],
+      "title": "Images Scanned",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "cyan", "mode": "fixed"}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(DISTINCT f.raw_data->>'PkgName') AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND f.raw_data->>'PkgName' IS NOT NULL", "refId": "A"}],
+      "title": "Unique Packages",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "id": 6,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND f.status IN ('resolved','accepted','false_positive')", "refId": "A"}],
+      "title": "Closed",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto"}}
+      },
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
+      "id": 7,
+      "options": {"showHeader": true, "footer": {"show": false}},
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT f.raw_data->>'PkgName' AS package, f.raw_data->>'InstalledVersion' AS installed, f.raw_data->>'FixedVersion' AS fixed, f.cve_id AS cve, f.severity, ROUND(f.cvss_score::numeric, 1) AS cvss FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND f.severity IN ('critical','high') AND f.status NOT IN ('resolved','accepted','false_positive') ORDER BY f.cvss_score DESC NULLS LAST LIMIT 25", "refId": "A"}],
+      "title": "Top Critical/High CVEs",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisPlacement": "auto", "fillOpacity": 80, "lineWidth": 1}, "unit": "short"},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "critical"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "high"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+          {"matcher": {"id": "byName", "options": "medium"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#EAB839"}}]},
+          {"matcher": {"id": "byName", "options": "low"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3274D9"}}]}
+        ]
+      },
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 14},
+      "id": 8,
+      "options": {
+        "barWidth": 0.8, "groupWidth": 0.7,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "horizontal", "showValue": "auto", "stacking": "normal",
+        "tooltip": {"mode": "multi"}, "xTickLabelRotation": 0
+      },
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT REGEXP_REPLACE(s.config_json->>'target', '.*/', '') AS image, COUNT(*) FILTER (WHERE f.severity = 'critical') AS critical, COUNT(*) FILTER (WHERE f.severity = 'high') AS high, COUNT(*) FILTER (WHERE f.severity = 'medium') AS medium, COUNT(*) FILTER (WHERE f.severity = 'low') AS low FROM findings f JOIN scans s ON s.id = f.scan_id WHERE s.config_json->>'scan_subtype' = 'dependency' AND s.config_json->>'target' IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 15", "refId": "A"}],
+      "title": "Findings by Image (Top 15)",
+      "type": "barchart"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["secguard", "dependency"],
+  "templating": {"list": []},
+  "time": {"from": "now-30d", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Image Vulnerabilities",
+  "uid": "secguard-images",
+  "version": 1,
+  "weekStart": ""
+}
