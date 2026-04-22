@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -165,6 +166,34 @@ def run_scan_task(self, scan_id: str):
                     except Exception as e:
                         logger.warning(f"Failed to clone repo: {e}. Continuing with empty target.")
 
+            # For SAST code uploads: extract archive to temp dir
+            code_extract_dir = None
+            if scan.tool_name == "semgrep" and target and (
+                target.endswith(".zip") or target.endswith(".tar") or
+                target.endswith(".tar.gz") or target.endswith(".tgz")
+            ):
+                import tempfile, zipfile, tarfile, shutil
+                code_extract_dir = tempfile.mkdtemp(prefix="sast_")
+                try:
+                    if target.endswith(".zip"):
+                        with zipfile.ZipFile(target, "r") as zf:
+                            zf.extractall(code_extract_dir)
+                    else:
+                        with tarfile.open(target, "r:*") as tf:
+                            tf.extractall(code_extract_dir)
+                    # If extracted to a single subdirectory, use that
+                    entries = os.listdir(code_extract_dir)
+                    if len(entries) == 1 and os.path.isdir(os.path.join(code_extract_dir, entries[0])):
+                        target = os.path.join(code_extract_dir, entries[0])
+                    else:
+                        target = code_extract_dir
+                    logger.info(f"Extracted code archive to {target}")
+                except Exception as e:
+                    logger.error(f"Failed to extract code archive: {e}")
+                    if code_extract_dir and os.path.exists(code_extract_dir):
+                        shutil.rmtree(code_extract_dir, ignore_errors=True)
+                    raise
+
             if is_sbom:
                 sbom_data = integration.run_sbom_scan(target, config)
                 scan.output_data = sbom_data or {}
@@ -203,12 +232,14 @@ def run_scan_task(self, scan_id: str):
                 session.commit()
                 logger.info(f"Scan {scan_id} completed: {count} findings")
 
-            # Cleanup cloned repo
+            # Cleanup cloned repo and extracted code
             if clone_dir:
                 from app.services.remote_scan import cleanup_repo
                 cleanup_repo(clone_dir)
+            if code_extract_dir and os.path.exists(code_extract_dir):
+                import shutil
+                shutil.rmtree(code_extract_dir, ignore_errors=True)
             if kubeconfig_tmpfile:
-                import os
                 try: os.remove(kubeconfig_tmpfile)
                 except OSError: pass
 
@@ -219,12 +250,14 @@ def run_scan_task(self, scan_id: str):
             scan.completed_at = datetime.now(timezone.utc)
             session.commit()
 
-            # Cleanup cloned repo
+            # Cleanup cloned repo and extracted code
             if clone_dir:
                 from app.services.remote_scan import cleanup_repo
                 cleanup_repo(clone_dir)
+            if code_extract_dir and os.path.exists(code_extract_dir):
+                import shutil
+                shutil.rmtree(code_extract_dir, ignore_errors=True)
             if kubeconfig_tmpfile:
-                import os
                 try: os.remove(kubeconfig_tmpfile)
                 except OSError: pass
 

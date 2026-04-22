@@ -27,6 +27,20 @@ export const triggerImageUploadScan = async (
   return response.data;
 };
 
+export const triggerCodeUploadScan = async (
+  projectId: string,
+  file: File,
+) => {
+  const formData = new FormData();
+  formData.append('project_id', projectId);
+  formData.append('file', file);
+  const response = await api.post('/scans/trigger-code-upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  invalidateCache(/\/scans|\/dashboard/);
+  return response.data;
+};
+
 export const getScans = async (params?: {
   project_id?: string;
   tool_name?: string;

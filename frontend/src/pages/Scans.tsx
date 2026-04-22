@@ -4,7 +4,7 @@ import {
   Shield, Lock, FileText, Code, Globe, Server,
   Play, RefreshCw, X, FolderOpen, Upload, CheckCircle, AlertCircle,
 } from 'lucide-react';
-import { getScans, triggerScan, triggerImageUploadScan } from '../api/scans';
+import { getScans, triggerScan, triggerImageUploadScan, triggerCodeUploadScan } from '../api/scans';
 import { getProjects, getKubeconfigStatus, uploadKubeconfig } from '../api/projects';
 import { useAuthStore } from '../stores/authStore';
 import StatusBadge from '../components/common/StatusBadge';
@@ -69,8 +69,8 @@ const CATEGORIES = [
     icon: Code,
     color: 'yellow',
     tool: 'semgrep',
-    description: 'Static Application Security Testing -find code-level vulnerabilities.',
-    targetTypes: ['repo'],
+    description: 'Static Application Security Testing - find code-level vulnerabilities.',
+    targetTypes: ['repo', 'code_upload'],
     showCredentials: false,
   },
   {
@@ -253,9 +253,14 @@ function TriggerModal({ category, onClose, onSuccess }: {
     // ── Single scan mode ──────────────────────────────────────────────
     try {
       let scan: Scan;
-      if (targetType === 'image_upload') {
-        if (!file) { setError('Select a .tar / .tar.gz file.'); setSubmitting(false); return; }
-        scan = await triggerImageUploadScan(project, file, regUser || undefined, regPass || undefined);
+      if (targetType === 'image_upload' || targetType === 'code_upload') {
+        if (!file) { setError(`Select a file to upload.`); setSubmitting(false); return; }
+        if (targetType === 'code_upload') {
+          // Upload file then trigger semgrep scan on it
+          scan = await triggerCodeUploadScan(project, file);
+        } else {
+          scan = await triggerImageUploadScan(project, file, regUser || undefined, regPass || undefined);
+        }
       } else {
         const config: Record<string, string> = { scan_subtype: category.key };
         if (category.tool === 'trivy') {
@@ -315,7 +320,7 @@ function TriggerModal({ category, onClose, onSuccess }: {
                     className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                       targetType === t ? `${colors.bg} ${colors.border} ${colors.icon} border` : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                     }`}>
-                    {{ repo: 'Git Repository', image: 'Image Name / Registry', image_upload: 'Upload Image File', image_bulk: 'Bulk Images', url: 'Web URL', fs: 'Filesystem', cluster: 'Live Cluster' }[t]}
+                    {{ repo: 'Git Repository', image: 'Image Name / Registry', image_upload: 'Upload Image File', image_bulk: 'Bulk Images', url: 'Web URL', fs: 'Filesystem', cluster: 'Live Cluster', code_upload: 'Upload Source Code' }[t]}
                   </button>
                 ))}
               </div>
@@ -385,6 +390,16 @@ function TriggerModal({ category, onClose, onSuccess }: {
                 onChange={e => setFile(e.target.files?.[0] ?? null)}
                 className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-gray-200" />
               <p className="mt-1 text-xs text-gray-400">.tar, .tar.gz, .tgz -max 2 GB</p>
+            </div>
+          )}
+
+          {targetType === 'code_upload' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Source Code Archive <span className="text-red-500">*</span></label>
+              <input ref={fileRef} type="file" accept=".zip,.tar,.tar.gz,.tgz"
+                onChange={e => setFile(e.target.files?.[0] ?? null)}
+                className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-gray-200" />
+              <p className="mt-1 text-xs text-gray-400">.zip, .tar, .tar.gz - upload your project source code</p>
             </div>
           )}
 

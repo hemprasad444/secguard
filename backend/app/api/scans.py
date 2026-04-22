@@ -106,6 +106,44 @@ async def trigger_image_upload_scan(
     return scan
 
 
+@router.post("/trigger-code-upload", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
+async def trigger_code_upload_scan(
+    project_id: UUID = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("developer")),
+):
+    """Upload source code (zip/tar) and scan with Semgrep SAST."""
+    valid_ext = (".zip", ".tar", ".tar.gz", ".tgz")
+    if not any(file.filename.endswith(ext) for ext in valid_ext):
+        raise HTTPException(status_code=400, detail="Only .zip, .tar, .tar.gz, or .tgz files are supported.")
+
+    upload_dir = os.path.join(settings.UPLOAD_DIR, "code")
+    os.makedirs(upload_dir, exist_ok=True)
+    dest = os.path.join(upload_dir, f"{project_id}_{file.filename}")
+
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    config = {"target": dest, "scan_subtype": "sast", "source_file": file.filename}
+
+    scan = Scan(
+        project_id=project_id,
+        tool_name="semgrep",
+        scan_type="sast",
+        status="pending",
+        triggered_by=current_user.id,
+        config_json=config,
+    )
+    db.add(scan)
+    await db.flush()
+    await db.refresh(scan)
+    await db.commit()
+
+    run_scan_task.delay(str(scan.id))
+    return scan
+
+
 @router.get("/", response_model=list[ScanResponse])
 async def list_scans(
     project_id: UUID | None = Query(None),
