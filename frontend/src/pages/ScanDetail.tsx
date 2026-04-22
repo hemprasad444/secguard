@@ -460,48 +460,36 @@ export default function ScanDetail() {
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
-      {/* Image header card */}
-      <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-6">
+      {/* Image header */}
+      <div className="border border-gray-200 bg-white rounded-md p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 shadow-sm">
-              <Icon className="h-6 w-6 text-blue-600" />
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50">
+              <Icon className="h-5 w-5 text-gray-700" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{scanLabel(scan)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{scanLabel(scan)}</p>
               {img ? (
-                <h1 className="mt-0.5 text-lg font-bold text-gray-900 font-mono">{img}</h1>
+                <h1 className="mt-0.5 text-sm font-semibold text-gray-900 font-mono break-all">{img}</h1>
               ) : (
-                <h1 className="mt-0.5 text-lg font-bold text-gray-900">{targetLabel(scan) || 'Scan Results'}</h1>
+                <h1 className="mt-0.5 text-base font-semibold text-gray-900">{targetLabel(scan) || 'Scan Results'}</h1>
               )}
-              <p className="mt-1 text-xs text-gray-500">
-                Scanned {scan.completed_at ? new Date(scan.completed_at).toLocaleString() : ''}
+              <p className="mt-1 text-xs text-gray-500 font-mono">
+                {scan.completed_at ? new Date(scan.completed_at).toLocaleString() : ''}
               </p>
-              {/* Stats row */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs">
-                  <span className="font-bold text-gray-800">{findings.length}</span> <span className="text-gray-400">total</span>
-                </span>
-                <span className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs">
-                  <span className="font-bold text-red-600">{openCount}</span> <span className="text-red-400">open</span>
-                </span>
-                <span className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs">
-                  <span className="font-bold text-green-600">{closedCount}</span> <span className="text-green-400">closed</span>
-                </span>
+              {/* Stats row - flat style with vertical bars */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono">
+                <span><span className="font-semibold text-gray-900 tabular-nums">{findings.length}</span> <span className="text-gray-500">total</span></span>
+                <span className="border-l-2 border-red-600 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{openCount}</span> <span className="text-gray-500">open</span></span>
+                <span className="border-l-2 border-green-600 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{closedCount}</span> <span className="text-gray-500">closed</span></span>
                 {isDep && (
                   <>
-                    <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs">
-                      <CheckCircle className="inline h-3 w-3 text-emerald-500 mr-0.5" />
-                      <span className="font-bold text-emerald-600">{fixableCount}</span> <span className="text-emerald-400">fixable</span>
-                    </span>
-                    <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs">
-                      <XCircle className="inline h-3 w-3 text-gray-400 mr-0.5" />
-                      <span className="font-bold text-gray-600">{noFixCount}</span> <span className="text-gray-400">no fix</span>
-                    </span>
+                    <span className="border-l-2 border-emerald-500 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{fixableCount}</span> <span className="text-gray-500">fixable</span></span>
+                    <span className="border-l-2 border-gray-300 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{noFixCount}</span> <span className="text-gray-500">no-fix</span></span>
                   </>
                 )}
-                {sevCounts.critical > 0 && <span className="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">{sevCounts.critical} Critical</span>}
-                {sevCounts.high > 0 && <span className="rounded-lg bg-orange-100 px-2.5 py-1 text-xs font-bold text-orange-700">{sevCounts.high} High</span>}
+                {sevCounts.critical > 0 && <span className="border-l-2 border-red-600 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{sevCounts.critical}</span> <span className="text-gray-500">Crit</span></span>}
+                {sevCounts.high > 0 && <span className="border-l-2 border-orange-500 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{sevCounts.high}</span> <span className="text-gray-500">High</span></span>}
               </div>
             </div>
           </div>
@@ -510,13 +498,13 @@ export default function ScanDetail() {
           <div className="flex flex-wrap items-center gap-2">
             {(isDep || isSecrets) && openCount > 0 && (
               <button onClick={() => setShowVerifyModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm">
-                <CheckCircle className="h-4 w-4" /> Verify Fixed Image
+                className="inline-flex items-center gap-1.5 rounded border border-gray-900 bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800">
+                <CheckCircle className="h-3.5 w-3.5" /> Verify Fixed Image
               </button>
             )}
             {openCount === 0 && findings.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-green-100 border border-green-200 px-4 py-2 text-sm font-bold text-green-700">
-                <CheckCircle className="h-4 w-4" /> All Closed
+              <span className="inline-flex items-center gap-1.5 rounded border border-green-600 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+                <CheckCircle className="h-3.5 w-3.5" /> All Closed
               </span>
             )}
             {!isSbom && findings.length > 0 && (

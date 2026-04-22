@@ -230,72 +230,40 @@ export default function K8sScanDetail() {
       </button>
 
       {/* Header */}
-      <div className="rounded-2xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-5">
+      <div className="border border-gray-200 bg-white rounded-md px-5 py-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100">
-              <Server className="h-6 w-6 text-green-600" />
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50">
+              <Server className="h-5 w-5 text-gray-700" />
             </div>
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-gray-900">K8s Security - {toolLabel}</h1>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">K8s Security</p>
+                <span className="text-[10px] text-gray-300">·</span>
+                <p className="text-[10px] font-mono text-gray-600 uppercase">{toolLabel}</p>
                 <StatusBadge status={scan.status} />
               </div>
-              <p className="mt-1 text-sm text-gray-500">
-                Scanned {scan.completed_at ? new Date(scan.completed_at).toLocaleString() : '—'}
+              <h1 className="mt-0.5 text-sm font-semibold text-gray-900 font-mono">{toolLabel} Scan</h1>
+              <p className="mt-0.5 text-xs text-gray-500 font-mono">
+                {scan.completed_at ? new Date(scan.completed_at).toLocaleString() : ''}
               </p>
-              {/* Top-level stats */}
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <div className="rounded-lg border border-gray-200 bg-white px-3 py-1.5">
-                  <span className="text-lg font-bold text-gray-800">{filtered.length}</span>
-                  <span className="ml-1.5 text-xs text-gray-500">Findings</span>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white px-3 py-1.5">
-                  <span className="text-lg font-bold text-gray-800">{groups.length}</span>
-                  <span className="ml-1.5 text-xs text-gray-500">Resources</span>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white px-3 py-1.5">
-                  <span className="text-lg font-bold text-gray-800">{uniqueNamespaces}</span>
-                  <span className="ml-1.5 text-xs text-gray-500">Namespaces</span>
-                </div>
-                {sevCounts.critical > 0 && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5">
-                    <span className="text-lg font-bold text-red-600">{sevCounts.critical}</span>
-                    <span className="ml-1.5 text-xs text-red-500">Critical</span>
-                  </div>
-                )}
-                {sevCounts.high > 0 && (
-                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5">
-                    <span className="text-lg font-bold text-orange-600">{sevCounts.high}</span>
-                    <span className="ml-1.5 text-xs text-orange-500">High</span>
-                  </div>
-                )}
-                {sevCounts.medium > 0 && (
-                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-1.5">
-                    <span className="text-lg font-bold text-yellow-600">{sevCounts.medium}</span>
-                    <span className="ml-1.5 text-xs text-yellow-500">Medium</span>
-                  </div>
-                )}
-                {sevCounts.low > 0 && (
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5">
-                    <span className="text-lg font-bold text-blue-600">{sevCounts.low}</span>
-                    <span className="ml-1.5 text-xs text-blue-500">Low</span>
-                  </div>
-                )}
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5">
-                  <span className="text-lg font-bold text-red-600">{openCount}</span>
-                  <span className="ml-1.5 text-xs text-red-500">Open</span>
-                </div>
-                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-1.5">
-                  <span className="text-lg font-bold text-green-600">{closedCount}</span>
-                  <span className="ml-1.5 text-xs text-green-500">Closed</span>
-                </div>
+              {/* Stats row - flat style with vertical bars */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono">
+                <span><span className="font-semibold text-gray-900 tabular-nums">{filtered.length}</span> <span className="text-gray-500">findings</span></span>
+                <span className="border-l-2 border-slate-400 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{groups.length}</span> <span className="text-gray-500">resources</span></span>
+                <span className="border-l-2 border-slate-400 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{uniqueNamespaces}</span> <span className="text-gray-500">namespaces</span></span>
+                {sevCounts.critical > 0 && <span className="border-l-2 border-red-600 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{sevCounts.critical}</span> <span className="text-gray-500">Crit</span></span>}
+                {sevCounts.high > 0 && <span className="border-l-2 border-orange-500 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{sevCounts.high}</span> <span className="text-gray-500">High</span></span>}
+                {sevCounts.medium > 0 && <span className="border-l-2 border-yellow-500 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{sevCounts.medium}</span> <span className="text-gray-500">Med</span></span>}
+                {sevCounts.low > 0 && <span className="border-l-2 border-blue-500 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{sevCounts.low}</span> <span className="text-gray-500">Low</span></span>}
+                <span className="border-l-2 border-red-600 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{openCount}</span> <span className="text-gray-500">open</span></span>
+                <span className="border-l-2 border-green-600 pl-2"><span className="font-semibold text-gray-900 tabular-nums">{closedCount}</span> <span className="text-gray-500">closed</span></span>
               </div>
             </div>
           </div>
           <button onClick={downloadReport} disabled={findings.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40">
-            <Download className="h-4 w-4" /> Export XLSX
+            className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40">
+            <Download className="h-3.5 w-3.5" /> Export
           </button>
         </div>
       </div>

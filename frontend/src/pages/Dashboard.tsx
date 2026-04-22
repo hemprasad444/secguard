@@ -64,11 +64,11 @@ const SEV_COLORS: Record<string, string> = {
   critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#9ca3af',
 };
 const SCAN_COLORS: Record<string, string> = {
-  Dependency: '#3b82f6', Secrets: '#ef4444', SBOM: '#8b5cf6',
-  SAST: '#f59e0b', DAST: '#f97316', K8s: '#10b981',
+  Dependency: '#0891b2', Secrets: '#dc2626', SBOM: '#7c3aed',
+  SAST: '#d97706', DAST: '#ea580c', K8s: '#059669',
 };
-const SCAN_ICONS: Record<string, string> = {
-  Dependency: '📦', Secrets: '🔑', SBOM: '📋', SAST: '🔍', DAST: '🌐', K8s: '⚙️',
+const SCAN_LUCIDE_ICONS: Record<string, React.ElementType> = {
+  Dependency: Package, Secrets: Key, SBOM: FileText, SAST: Shield, DAST: Globe, K8s: Server,
 };
 const CMP_A = '#6366f1';
 const CMP_B = '#ec4899';
@@ -713,15 +713,19 @@ function ScanTypeCards({ data, viewMode }: { data: ScanTypeSev[]; viewMode: 'fin
         const accent = SCAN_COLORS[d.scan_type] ?? '#6366f1';
         return (
           <div key={d.scan_type}
-            className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-            <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl" style={{ background: accent }} />
+            className="relative overflow-hidden rounded-md border border-gray-200 bg-white p-4">
+            <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: accent }} />
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg text-base"
-                  style={{ background: accent + '18' }}>
-                  {SCAN_ICONS[d.scan_type] ?? '🛡️'}
-                </div>
-                <span className="text-sm font-semibold text-gray-700">{d.scan_type}</span>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const Ic = SCAN_LUCIDE_ICONS[d.scan_type] ?? Shield;
+                  return (
+                    <div className="flex h-7 w-7 items-center justify-center rounded" style={{ background: accent + '15' }}>
+                      <Ic className="h-3.5 w-3.5" style={{ color: accent }} />
+                    </div>
+                  );
+                })()}
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-600">{d.scan_type}</span>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold tracking-tight" style={{ color: accent, fontVariantNumeric: 'tabular-nums' }}>
@@ -1207,59 +1211,58 @@ function K8sDashboard({
   return (
     <div className="space-y-6">
       {/* ── Tool toggle ── */}
-      <div className="flex items-center gap-1 rounded-2xl bg-gray-100 p-1 w-fit">
+      <div className="inline-flex border border-gray-300 rounded-md overflow-hidden w-fit">
         {[
           { key: '', label: 'All Tools' },
           { key: 'trivy', label: 'Trivy' },
           { key: 'kubescape', label: 'Kubescape' },
-        ].map(opt => {
+        ].map((opt, idx) => {
           const active = k8sTool === opt.key;
           return (
             <button key={opt.key} onClick={() => setK8sTool(opt.key)}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
-                active ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${idx > 0 ? 'border-l border-gray-300' : ''} ${
+                active ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}>
-              {active && <span className="h-2 w-2 rounded-full" style={{ background: opt.key === 'kubescape' ? '#10b981' : opt.key === 'trivy' ? '#3b82f6' : '#6366f1' }} />}
               {opt.label}
             </button>
           );
         })}
       </div>
 
-      {/* ── Cluster health banner ── */}
-      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 p-6">
+      {/* ── Cluster health ── */}
+      <div className="border border-gray-200 bg-white rounded-md p-5">
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 shadow-sm">
-              <Server className="h-7 w-7 text-emerald-600" />
+            <div className="flex h-11 w-11 items-center justify-center rounded border border-gray-200 bg-gray-50">
+              <Server className="h-5 w-5 text-gray-700" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
-                {k8sTool ? `${k8sTool.charAt(0).toUpperCase() + k8sTool.slice(1)} - ` : ''}Cluster Security Posture
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+                {k8sTool ? `${k8sTool.charAt(0).toUpperCase() + k8sTool.slice(1)} ` : ''}Cluster Posture
               </h2>
-              <p className="text-sm text-gray-500">{k8sNamespaces.length} namespaces · {k8sResources.length} resources scanned</p>
+              <p className="text-xs text-gray-500 font-mono mt-0.5">{k8sNamespaces.length} namespaces · {k8sResources.length} resources</p>
             </div>
           </div>
           <div className="flex items-center gap-6">
             {/* Compliance score ring */}
-            <div className="relative flex h-20 w-20 items-center justify-center">
-              <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+            <div className="relative flex h-16 w-16 items-center justify-center">
+              <svg className="h-16 w-16 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" strokeWidth="2.5" />
                 <circle cx="18" cy="18" r="15" fill="none"
-                  stroke={complianceScore >= 80 ? '#10b981' : complianceScore >= 50 ? '#f59e0b' : '#ef4444'}
-                  strokeWidth="3" strokeDasharray={`${complianceScore * 0.942} 100`} strokeLinecap="round" />
+                  stroke={complianceScore >= 80 ? '#059669' : complianceScore >= 50 ? '#d97706' : '#dc2626'}
+                  strokeWidth="2.5" strokeDasharray={`${complianceScore * 0.942} 100`} strokeLinecap="round" />
               </svg>
               <div className="absolute text-center">
-                <span className="text-lg font-bold text-gray-900">{complianceScore}</span>
-                <span className="block text-[8px] font-medium text-gray-400 uppercase">Score</span>
+                <span className="text-base font-semibold text-gray-900 tabular-nums">{complianceScore}</span>
+                <span className="block text-[8px] text-gray-400 uppercase tracking-wider">Score</span>
               </div>
             </div>
-            {/* Severity pills */}
-            <div className="grid grid-cols-2 gap-2">
-              {crit > 0 && <span className="rounded-lg bg-red-100 px-3 py-1.5 text-center text-xs font-bold text-red-700">{crit} Critical</span>}
-              {high > 0 && <span className="rounded-lg bg-orange-100 px-3 py-1.5 text-center text-xs font-bold text-orange-700">{high} High</span>}
-              {med > 0 && <span className="rounded-lg bg-yellow-100 px-3 py-1.5 text-center text-xs font-bold text-yellow-700">{med} Medium</span>}
-              {low > 0 && <span className="rounded-lg bg-blue-100 px-3 py-1.5 text-center text-xs font-bold text-blue-700">{low} Low</span>}
+            {/* Severity pills - flat style */}
+            <div className="flex items-center gap-1.5 text-xs font-mono">
+              {crit > 0 && <span className="border-l-2 border-red-600 pl-2"><span className="font-semibold text-gray-900">{crit}</span> <span className="text-gray-500">Crit</span></span>}
+              {high > 0 && <span className="border-l-2 border-orange-500 pl-2"><span className="font-semibold text-gray-900">{high}</span> <span className="text-gray-500">High</span></span>}
+              {med > 0 && <span className="border-l-2 border-yellow-500 pl-2"><span className="font-semibold text-gray-900">{med}</span> <span className="text-gray-500">Med</span></span>}
+              {low > 0 && <span className="border-l-2 border-blue-500 pl-2"><span className="font-semibold text-gray-900">{low}</span> <span className="text-gray-500">Low</span></span>}
             </div>
           </div>
         </div>
@@ -1561,14 +1564,14 @@ export default function Dashboard() {
   const nameB = projects.find(p => p.id === pidB)?.name ?? 'Project B';
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5">
 
       {/* ── Header bar ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Security Dashboard</h1>
-          <p className="mt-0.5 text-sm text-gray-400">
-            {selectedId ? `Vulnerability posture for ${projects.find(p => p.id === selectedId)?.name ?? 'project'}` : 'Vulnerability posture across all projects'}
+          <h1 className="text-xl font-semibold text-gray-900">Security Overview</h1>
+          <p className="mt-0.5 text-xs text-gray-500 font-mono">
+            {selectedId ? `project: ${projects.find(p => p.id === selectedId)?.name ?? 'unknown'}` : 'all projects'}
           </p>
         </div>
 
@@ -1576,7 +1579,7 @@ export default function Dashboard() {
           <select
             value={selectedId}
             onChange={e => { setSelectedId(e.target.value); setScanTypeFilter(''); }}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -1584,13 +1587,13 @@ export default function Dashboard() {
 
           <button
             onClick={() => setCompareMode(v => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium shadow-sm transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
               compareMode
-                ? 'border-indigo-500 bg-indigo-600 text-white shadow-indigo-100'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                ? 'border-gray-900 bg-gray-900 text-white'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <GitCompare className="h-4 w-4" />
+            <GitCompare className="h-3.5 w-3.5" />
             Compare
           </button>
         </div>
@@ -1598,22 +1601,21 @@ export default function Dashboard() {
 
       {/* ── Scan type tabs ── */}
       {!compareMode && availableScanTypes.length > 0 && (
-        <div className="flex items-center gap-1 rounded-2xl bg-gray-100 p-1 w-fit">
+        <div className="flex items-center gap-4 border-b border-gray-200">
           {availableScanTypes.map(label => {
             const accent = SCAN_COLORS[label] ?? '#6366f1';
             const active = scanTypeFilter === label;
+            const Ic = SCAN_LUCIDE_ICONS[label] ?? Shield;
             return (
               <button
                 key={label}
                 onClick={() => setScanTypeFilter(label)}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
-                  active ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                className={`inline-flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  active ? 'text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
+                style={active ? { borderColor: accent } : undefined}
               >
-                {active && (
-                  <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
-                )}
-                <span>{SCAN_ICONS[label] ?? '🛡️'}</span>
+                <Ic className="h-4 w-4" style={{ color: active ? accent : undefined }} />
                 {label}
               </button>
             );
