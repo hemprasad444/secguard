@@ -15,7 +15,7 @@ from app.tasks.scan_tasks import parse_report_task
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/secguard_uploads")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/opensentinel_uploads")
 
 
 @router.post("/upload", response_model=ReportResponse, status_code=status.HTTP_201_CREATED)

@@ -1,6 +1,6 @@
-# SecGuard - Unified Security Scanning Platform
+# OpenSentinel - Unified Security Scanning Platform
 
-SecGuard is an open-source, self-hosted security scanning platform that provides unified vulnerability management across your entire infrastructure - container images, Kubernetes clusters, source code, and web applications.
+OpenSentinel is an open-source, self-hosted security scanning platform that provides unified vulnerability management across your entire infrastructure - container images, Kubernetes clusters, source code, and web applications.
 
 ## Features
 
@@ -96,8 +96,8 @@ git --version             # Should show git version
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/hemprasad444/secguard.git
-cd secguard
+git clone https://github.com/hemprasad444/opensentinel.git
+cd opensentinel
 ```
 
 2. **Create environment file**
@@ -151,13 +151,13 @@ docker-compose ps
 ```
 
 You should see 7 containers running:
-- `secguard-frontend-1` (port 8080)
-- `secguard-backend-1` (port 8000)
-- `secguard-postgres-1` (port 5432)
-- `secguard-redis-1` (port 6379)
-- `secguard-celery-worker-1`
-- `secguard-celery-beat-1`
-- `secguard-trivy-1` (port 4954)
+- `opensentinel-frontend-1` (port 8080)
+- `opensentinel-backend-1` (port 8000)
+- `opensentinel-postgres-1` (port 5432)
+- `opensentinel-redis-1` (port 6379)
+- `opensentinel-celery-worker-1`
+- `opensentinel-celery-beat-1`
+- `opensentinel-trivy-1` (port 4954)
 
 ## Usage Guide
 
@@ -220,10 +220,10 @@ See [.env.example](.env.example) for all available configuration options.
 
 ### K8s Remote Scanning
 
-SecGuard scans Kubernetes clusters remotely via kubeconfig:
+OpenSentinel scans Kubernetes clusters remotely via kubeconfig:
 1. Download your kubeconfig from the cluster
 2. Upload it through the browser on the Scans page
-3. Scans run from the SecGuard backend - no agent needed on the cluster
+3. Scans run from the OpenSentinel backend - no agent needed on the cluster
 
 ### Custom Port
 

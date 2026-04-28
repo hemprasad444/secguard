@@ -1,0 +1,614 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Posture Summary",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "collapsed": false
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Findings",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Open",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND status IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND status IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Closed",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (SELECT CASE WHEN COUNT(*) = 0 THEN 0 ELSE 100.0 * COUNT(*) FILTER (WHERE status IN ('resolved','accepted','false_positive')) / COUNT(*) END FROM findings WHERE project_id::text = '${projectA:raw}' AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT CASE WHEN COUNT(*) = 0 THEN 0 ELSE 100.0 * COUNT(*) FILTER (WHERE status IN ('resolved','accepted','false_positive')) / COUNT(*) END FROM findings WHERE project_id::text = '${projectB:raw}' AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Resolution Rate",
+      "type": "stat"
+    },
+    {
+      "type": "row",
+      "title": "Severity Breakdown (Open)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 101,
+      "collapsed": false
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 5,
+      "options": {
+        "barWidth": 0.7,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xTickLabelRotation": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH sev AS (SELECT unnest(ARRAY['critical','high','medium','low']) AS severity) SELECT sev.severity, (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND severity = sev.severity AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND severity = sev.severity AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\" FROM sev",
+          "refId": "A"
+        }
+      ],
+      "title": "Open Findings by Severity",
+      "type": "barchart"
+    },
+    {
+      "type": "row",
+      "title": "Scan Coverage",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 102,
+      "collapsed": false
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 6,
+      "options": {
+        "barWidth": 0.7,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH types AS (SELECT unnest(ARRAY['dependency','secrets','sbom','k8s']) AS subtype, unnest(ARRAY['Dependency','Secrets','SBOM','K8s']) AS label) SELECT types.label AS scan_type, (SELECT COUNT(*) FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectA:raw}' AND (s.config_json->>'scan_subtype' = types.subtype OR (types.subtype='k8s' AND s.tool_name='kubescape')) AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(*) FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectB:raw}' AND (s.config_json->>'scan_subtype' = types.subtype OR (types.subtype='k8s' AND s.tool_name='kubescape')) AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\" FROM types",
+          "refId": "A"
+        }
+      ],
+      "title": "Open Findings by Scan Type",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "id": 7,
+      "options": {
+        "barWidth": 0.7,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 'Completed Scans' AS metric, (SELECT COUNT(*) FROM scans WHERE project_id::text = '${projectA:raw}' AND status = 'completed' AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(*) FROM scans WHERE project_id::text = '${projectB:raw}' AND status = 'completed' AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\" UNION ALL SELECT 'Images Scanned', (SELECT COUNT(DISTINCT config_json->>'target') FROM scans WHERE project_id::text = '${projectA:raw}' AND status = 'completed' AND config_json->>'target' IS NOT NULL AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(DISTINCT config_json->>'target') FROM scans WHERE project_id::text = '${projectB:raw}' AND status = 'completed' AND config_json->>'target' IS NOT NULL AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 'Failed Scans', (SELECT COUNT(*) FROM scans WHERE project_id::text = '${projectA:raw}' AND status = 'failed' AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(*) FROM scans WHERE project_id::text = '${projectB:raw}' AND status = 'failed' AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST))",
+          "refId": "A"
+        }
+      ],
+      "title": "Scan Coverage",
+      "type": "barchart"
+    },
+    {
+      "type": "row",
+      "title": "Fixability",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 103,
+      "collapsed": false
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 8,
+      "options": {
+        "barWidth": 0.7,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 'Fixable' AS category, (SELECT COUNT(DISTINCT f.raw_data->>'PkgName') FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectA:raw}' AND s.config_json->>'scan_subtype' = 'dependency' AND (f.raw_data->>'FixedVersion') IS NOT NULL AND (f.raw_data->>'FixedVersion') != '' AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectA:text}\", (SELECT COUNT(DISTINCT f.raw_data->>'PkgName') FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectB:raw}' AND s.config_json->>'scan_subtype' = 'dependency' AND (f.raw_data->>'FixedVersion') IS NOT NULL AND (f.raw_data->>'FixedVersion') != '' AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS \"${projectB:text}\" UNION ALL SELECT 'No Fix Available', (SELECT COUNT(DISTINCT f.raw_data->>'PkgName') FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectA:raw}' AND s.config_json->>'scan_subtype' = 'dependency' AND ((f.raw_data->>'FixedVersion') IS NULL OR (f.raw_data->>'FixedVersion') = '') AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(DISTINCT f.raw_data->>'PkgName') FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectB:raw}' AND s.config_json->>'scan_subtype' = 'dependency' AND ((f.raw_data->>'FixedVersion') IS NULL OR (f.raw_data->>'FixedVersion') = '') AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST))",
+          "refId": "A"
+        }
+      ],
+      "title": "Package Fixability (Unique Packages)",
+      "type": "barchart"
+    },
+    {
+      "type": "row",
+      "title": "Detailed Delta",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 104,
+      "collapsed": false
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "\u0394"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 9,
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH metrics AS ( SELECT 1 AS ord, 'Total Findings' AS metric, (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS a, (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) AS b UNION ALL SELECT 2, 'Open', (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 3, 'Closed', (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND status IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND status IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 4, 'Critical (open)', (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND severity='critical' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND severity='critical' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 5, 'High (open)', (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectA:raw}' AND severity='high' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(*) FROM findings WHERE project_id::text = '${projectB:raw}' AND severity='high' AND status NOT IN ('resolved','accepted','false_positive') AND scan_id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 6, 'Completed Scans', (SELECT COUNT(*) FROM scans WHERE project_id::text = '${projectA:raw}' AND status='completed' AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(*) FROM scans WHERE project_id::text = '${projectB:raw}' AND status='completed' AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 7, 'Images Scanned', (SELECT COUNT(DISTINCT config_json->>'target') FROM scans WHERE project_id::text = '${projectA:raw}' AND status='completed' AND config_json->>'target' IS NOT NULL AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(DISTINCT config_json->>'target') FROM scans WHERE project_id::text = '${projectB:raw}' AND status='completed' AND config_json->>'target' IS NOT NULL AND id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) UNION ALL SELECT 8, 'Fixable Packages', (SELECT COUNT(DISTINCT f.raw_data->>'PkgName') FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectA:raw}' AND s.config_json->>'scan_subtype' = 'dependency' AND (f.raw_data->>'FixedVersion') IS NOT NULL AND (f.raw_data->>'FixedVersion') != '' AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)), (SELECT COUNT(DISTINCT f.raw_data->>'PkgName') FROM findings f JOIN scans s ON s.id=f.scan_id WHERE f.project_id::text = '${projectB:raw}' AND s.config_json->>'scan_subtype' = 'dependency' AND (f.raw_data->>'FixedVersion') IS NOT NULL AND (f.raw_data->>'FixedVersion') != '' AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) ) SELECT metric AS \"Metric\", a AS \"${projectA:text}\", b AS \"${projectB:text}\", (b - a) AS \"\u0394\" FROM metrics ORDER BY ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Metric-by-Metric Comparison",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "opensentinel",
+    "compare"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY created_at DESC",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Project A",
+        "multi": false,
+        "name": "projectA",
+        "options": [],
+        "query": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY created_at DESC",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY created_at DESC",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Project B",
+        "multi": false,
+        "name": "projectB",
+        "options": [],
+        "query": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY created_at DESC",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Project Comparison",
+  "uid": "opensentinel-compare",
+  "version": 2
+}

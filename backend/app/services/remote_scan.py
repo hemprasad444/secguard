@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def clone_repo(repo_url: str, branch: str = "main") -> str:
     """Clone a git repo to a temp directory and return the path."""
-    clone_dir = os.path.join(tempfile.gettempdir(), f"secguard_scan_{uuid4().hex[:12]}")
+    clone_dir = os.path.join(tempfile.gettempdir(), f"opensentinel_scan_{uuid4().hex[:12]}")
     try:
         result = subprocess.run(
             ["git", "clone", "--depth", "1", "--branch", branch, repo_url, clone_dir],

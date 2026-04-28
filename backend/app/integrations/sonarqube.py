@@ -2,7 +2,6 @@ import logging
 
 import httpx
 
-from app.config import settings
 from app.integrations.base import BaseIntegration, NormalizedFinding
 from app.utils.dedup import compute_fingerprint
 from app.utils.severity_mapper import normalize_severity
@@ -19,66 +18,78 @@ _SONAR_SEVERITY_MAP = {
 }
 
 
+def _client(url: str, token: str | None) -> httpx.Client:
+    auth = (token, "") if token else None
+    return httpx.Client(base_url=url.rstrip("/"), timeout=30.0, auth=auth)
+
+
+def ping(url: str, token: str | None) -> tuple[bool, str]:
+    """Test connection. Returns (ok, detail)."""
+    try:
+        with _client(url, token) as c:
+            r = c.get("/api/system/ping")
+            if r.status_code == 200 and r.text.strip().lower() == "pong":
+                return True, "pong"
+            r2 = c.get("/api/authentication/validate")
+            if r2.status_code == 200:
+                valid = r2.json().get("valid", False)
+                return (valid, "authenticated" if valid else "invalid token")
+            return False, f"HTTP {r.status_code} {r.text[:120]}"
+    except httpx.HTTPError as exc:
+        return False, f"connection error: {exc}"
+
+
 class SonarQubeIntegration(BaseIntegration):
     tool_name = "sonarqube"
     scan_type = "sast"
 
-    def __init__(self):
-        self.sonar_url = getattr(settings, "SONARQUBE_URL", "http://localhost:9000")
-        self.sonar_token = getattr(settings, "SONARQUBE_TOKEN", "")
+    def __init__(self, url: str | None = None, token: str | None = None):
+        self.sonar_url = (url or "").rstrip("/")
+        self.sonar_token = token or ""
 
     def run_scan(self, target: str, config: dict) -> list[NormalizedFinding]:
         """Fetch issues from SonarQube API for the given project key.
 
         The `target` parameter should be the SonarQube component/project key.
+        URL/token come from `__init__` so each project can hit a different SonarQube install.
         """
+        if not self.sonar_url:
+            logger.error("SonarQube scan requested without a URL configured")
+            return []
+
         page_size = config.get("page_size", 500)
         issue_types = config.get("types", "VULNERABILITY,BUG")
         findings: list[NormalizedFinding] = []
 
         try:
-            client = httpx.Client(
-                base_url=self.sonar_url,
-                timeout=30.0,
-                auth=(self.sonar_token, "") if self.sonar_token else None,
-            )
-
-            page = 1
-            total_fetched = 0
-
-            while True:
-                resp = client.get(
-                    "/api/issues/search",
-                    params={
-                        "componentKeys": target,
-                        "types": issue_types,
-                        "ps": page_size,
-                        "p": page,
-                        "statuses": "OPEN,CONFIRMED,REOPENED",
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-
-                issues = data.get("issues", [])
-                if not issues:
-                    break
-
-                for issue in issues:
-                    findings.append(self._issue_to_finding(issue))
-
-                total_fetched += len(issues)
-                total_available = data.get("total", 0)
-                if total_fetched >= total_available:
-                    break
-                page += 1
-
-            client.close()
-            logger.info(
-                "Fetched %d findings from SonarQube for %s", len(findings), target
-            )
+            with _client(self.sonar_url, self.sonar_token) as client:
+                page = 1
+                total_fetched = 0
+                while True:
+                    resp = client.get(
+                        "/api/issues/search",
+                        params={
+                            "componentKeys": target,
+                            "types": issue_types,
+                            "ps": page_size,
+                            "p": page,
+                            "statuses": "OPEN,CONFIRMED,REOPENED",
+                        },
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    issues = data.get("issues", [])
+                    if not issues:
+                        break
+                    for issue in issues:
+                        findings.append(self._issue_to_finding(issue))
+                    total_fetched += len(issues)
+                    total_available = data.get("total", 0)
+                    if total_fetched >= total_available:
+                        break
+                    page += 1
+            logger.info("Fetched %d findings from SonarQube for %s", len(findings), target)
             return findings
-
         except httpx.HTTPError as exc:
             logger.error("HTTP error communicating with SonarQube: %s", exc)
             return []
@@ -88,27 +99,20 @@ class SonarQubeIntegration(BaseIntegration):
 
     def parse_report(self, report_path: str) -> list[NormalizedFinding]:
         """Not applicable for SonarQube -- issues are fetched via API."""
-        logger.info(
-            "SonarQube integration does not support file-based report parsing"
-        )
         return []
 
     def _issue_to_finding(self, issue: dict) -> NormalizedFinding:
-        """Convert a SonarQube issue dict to a NormalizedFinding."""
         raw_severity = issue.get("severity", "INFO")
         severity = _SONAR_SEVERITY_MAP.get(raw_severity, raw_severity.lower())
 
         component = issue.get("component", "")
-        # Component format: project_key:path/to/file
         file_path = component.split(":", 1)[1] if ":" in component else component
         line_number = issue.get("line")
 
-        # Extract CWE if present in tags
         cwe_id = None
-        tags = issue.get("tags", [])
-        for tag in tags:
-            if tag.startswith("cwe-"):
-                cwe_id = tag.upper().replace("-", "-")
+        for tag in issue.get("tags", []) or []:
+            if isinstance(tag, str) and tag.startswith("cwe-"):
+                cwe_id = tag.upper()
                 break
 
         finding = NormalizedFinding(

@@ -12,7 +12,7 @@ from app.models.project import Project
 from app.models.report import Report
 from app.models.scan import Scan
 from app.models.user import User
-from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, SonarQubeConfig
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -167,3 +167,85 @@ async def kubeconfig_status(
     configured = project.kubeconfig_data is not None
     clusters = len(project.kubeconfig_data.get("clusters", [])) if configured else 0
     return {"configured": configured, "clusters": clusters}
+
+
+# ── SonarQube integration ────────────────────────────────────────────────────
+
+@router.put("/{project_id}/sonarqube", response_model=ProjectResponse)
+async def configure_sonarqube(
+    project_id: UUID,
+    config: SonarQubeConfig,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("security_engineer")),
+):
+    """Persist SonarQube URL/project key/token on a project. Token is optional on update."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project.sonarqube_url = config.url.rstrip("/") if config.url else None
+    project.sonarqube_project_key = config.project_key or None
+    if config.token is not None:
+        # Allow clearing the token by sending an empty string
+        project.sonarqube_token = config.token or None
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.delete("/{project_id}/sonarqube", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_sonarqube(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("security_engineer")),
+):
+    """Disconnect SonarQube from a project (clears URL, key, token)."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project.sonarqube_url = None
+    project.sonarqube_project_key = None
+    project.sonarqube_token = None
+    await db.commit()
+
+
+@router.post("/{project_id}/sonarqube/test")
+async def test_sonarqube(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Test the configured SonarQube connection (auth + ping)."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not project.sonarqube_url:
+        raise HTTPException(status_code=400, detail="SonarQube URL not configured")
+
+    # ping is sync — run in default executor to avoid blocking the event loop
+    import asyncio
+    from app.integrations.sonarqube import ping
+    ok, detail = await asyncio.to_thread(ping, project.sonarqube_url, project.sonarqube_token)
+    return {"ok": ok, "detail": detail}
+
+
+@router.post("/{project_id}/sonarqube/sync")
+async def sync_sonarqube(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("security_engineer")),
+):
+    """Queue a celery task to pull the latest SonarQube issues for the project."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not project.sonarqube_url or not project.sonarqube_project_key:
+        raise HTTPException(status_code=400, detail="SonarQube URL and project key are required")
+
+    from app.tasks.scan_tasks import sync_sonarqube_project_task
+    task = sync_sonarqube_project_task.delay(str(project.id))
+    return {"task_id": task.id, "status": "queued"}

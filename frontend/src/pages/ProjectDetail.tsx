@@ -3,14 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
   ExternalLink, Play, RefreshCw, X, ChevronRight, ChevronDown, ChevronUp,
-  Shield, Lock, FileText, Code, Globe, Server,
+  Shield, Lock, FileText, Code, Globe, Server, ArrowLeft,
   ArrowUpDown, Filter, Download, Trash2, FileDown,
 } from 'lucide-react';
 import { getProject } from '../api/projects';
 import { getScans, getScanFindings, getScanSbom, deleteScan } from '../api/scans';
+import { getSummary } from '../api/dashboard';
 import SeverityBadge from '../components/common/SeverityBadge';
 import StatusBadge from '../components/common/StatusBadge';
 import K8sFindingsView from '../components/K8sFindingsView';
+import SonarqubePanel from '../components/SonarqubePanel';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                 */
@@ -547,12 +549,12 @@ function ScanResultsDrawer({ scan, onClose }: { scan: Scan; onClose: () => void 
 /* Scan type definitions                                                  */
 /* ------------------------------------------------------------------ */
 const SCAN_TYPES = [
-  { key: 'dependency', label: 'Dependency Scan',  icon: Shield,   colorBg: 'bg-blue-50',   colorIcon: 'text-blue-600',   border: 'border-blue-100'   },
-  { key: 'secrets',    label: 'Secret Detection', icon: Lock,     colorBg: 'bg-red-50',    colorIcon: 'text-red-600',    border: 'border-red-100'    },
-  { key: 'sbom',       label: 'SBOM Generation',  icon: FileText, colorBg: 'bg-purple-50', colorIcon: 'text-purple-600', border: 'border-purple-100' },
-  { key: 'sast',       label: 'SAST',             icon: Code,     colorBg: 'bg-yellow-50', colorIcon: 'text-yellow-600', border: 'border-yellow-100' },
-  { key: 'dast',       label: 'DAST',             icon: Globe,    colorBg: 'bg-orange-50', colorIcon: 'text-orange-600', border: 'border-orange-100' },
-  { key: 'k8s',        label: 'K8s Security',     icon: Server,   colorBg: 'bg-green-50',  colorIcon: 'text-green-600',  border: 'border-green-100'  },
+  { key: 'dependency', label: 'Dependency', icon: Shield },
+  { key: 'secrets',    label: 'Secrets',    icon: Lock },
+  { key: 'sbom',       label: 'SBOM',       icon: FileText },
+  { key: 'sast',       label: 'SAST',       icon: Code },
+  { key: 'dast',       label: 'DAST',       icon: Globe },
+  { key: 'k8s',        label: 'Kubernetes', icon: Server },
 ] as const;
 
 function scanTypeKey(scan: Scan): string {
@@ -560,18 +562,61 @@ function scanTypeKey(scan: Scan): string {
   if (sub === 'secrets') return 'secrets';
   if (sub === 'sbom') return 'sbom';
   if (sub === 'k8s') return 'k8s';
-  if (scan.tool_name === 'semgrep') return 'sast';
+  if (scan.tool_name === 'semgrep' || scan.tool_name === 'sonarqube') return 'sast';
   if (scan.tool_name === 'zap') return 'dast';
   if (scan.tool_name === 'kubescape') return 'k8s';
   return 'dependency';
 }
 
 /* ------------------------------------------------------------------ */
+/* Relative time helper                                                    */
+/* ------------------------------------------------------------------ */
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60_000) return 'just now';
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scan type stats (from projects-overview endpoint)                      */
+/* ------------------------------------------------------------------ */
+interface TypeStats {
+  total_findings: number;
+  open_findings: number;
+  closed_findings: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  fixable_packages: number;
+  no_fix_packages: number;
+}
+
+/* Map card key → backend label expected by dashboard endpoints */
+const TYPE_LABEL: Record<string, string> = {
+  dependency: 'Dependency',
+  secrets:    'Secrets',
+  sbom:       'SBOM',
+  sast:       'SAST',
+  dast:       'DAST',
+  k8s:        'K8s',
+};
+
+/* ------------------------------------------------------------------ */
 /* Scan type block                                                        */
 /* ------------------------------------------------------------------ */
-function ScanTypeBlock({ type, scans, onView, onDownload, onDelete, onTypeClick, downloadingId, deletingId }: {
+function ScanTypeBlock({ type, scans, stats, onTypeClick }: {
   type: typeof SCAN_TYPES[number];
   scans: Scan[];
+  stats?: TypeStats;
   onView: (s: Scan) => void;
   onDownload: (e: React.MouseEvent, s: Scan) => void;
   onDelete: (e: React.MouseEvent, s: Scan) => void;
@@ -579,112 +624,124 @@ function ScanTypeBlock({ type, scans, onView, onDownload, onDelete, onTypeClick,
   downloadingId: string | null;
   deletingId: string | null;
 }) {
-  const [expanded, setExpanded] = useState(scans.length > 0);
   const Icon = type.icon;
   const running = scans.filter(s => s.status === 'pending' || s.status === 'running').length;
+  const completed = scans.filter(s => s.status === 'completed').length;
+  const failed = scans.filter(s => s.status === 'failed').length;
+  const isEmpty = scans.length === 0;
   const latest = scans[0];
 
+  const critical = stats?.critical ?? 0;
+  const high = stats?.high ?? 0;
+  const totalFindings = stats?.total_findings ?? scans.reduce((s, x) => s + (x.findings_count || 0), 0);
+  const openCount = stats?.open_findings ?? totalFindings;
+  const closedCount = stats?.closed_findings ?? 0;
+  const fixable = stats?.fixable_packages ?? 0;
+  const noFix = stats?.no_fix_packages ?? 0;
+  const isDependency = type.key === 'dependency';
+
+  /* Health state - drives the single status dot */
+  const health: 'empty' | 'running' | 'critical' | 'warning' | 'clean' | 'error' =
+    isEmpty ? 'empty'
+    : running > 0 ? 'running'
+    : failed > 0 && completed === 0 ? 'error'
+    : openCount === 0 && completed > 0 ? 'clean'
+    : critical > 0 ? 'critical'
+    : high > 0 ? 'warning'
+    : totalFindings === 0 ? 'clean'
+    : 'warning';
+
+  const dotClass = {
+    empty:    'bg-gray-300',
+    running:  'bg-amber-500',
+    critical: 'bg-red-500',
+    warning:  'bg-amber-500',
+    clean:    'bg-emerald-500',
+    error:    'bg-red-500',
+  }[health];
+
+  const hasCritical = critical > 0 && openCount > 0;
+  void health; void dotClass; // computed but unused in stripped-down card
+
   return (
-    <div className={`rounded-2xl border ${type.border} bg-white shadow-sm`}>
-      {/* Header — click icon+title area to open dedicated page */}
-      <div className="flex items-center justify-between px-5 py-4">
-        <button onClick={onTypeClick} className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${type.colorBg}`}>
-            <Icon className={`h-5 w-5 ${type.colorIcon}`} />
+    <button
+      onClick={onTypeClick}
+      className="group flex w-full items-center gap-4 border-b border-gray-100 bg-white px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-gray-50/60"
+    >
+      {/* Icon + name */}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Icon className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-[13px] font-medium text-gray-900">
+              {type.label}
+            </h3>
+            {running > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                running
+              </span>
+            )}
           </div>
-          <div>
-            <p className="font-semibold text-gray-800">{type.label}</p>
-            <p className="text-xs text-gray-400">{scans.length} scan{scans.length !== 1 ? 's' : ''}</p>
-          </div>
-        </button>
-        <div className="flex items-center gap-2">
-          {running > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600">
-              <RefreshCw className="h-3 w-3 animate-spin" />{running} running
-            </span>
-          )}
-          {latest && <StatusBadge status={latest.status} />}
-          {scans.length > 0 && (
-            <button onClick={() => setExpanded(v => !v)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          )}
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-gray-500">
+            {isEmpty
+              ? 'Not configured'
+              : latest?.completed_at
+                ? `${completed} completed${failed > 0 ? ` · ${failed} failed` : ''} · last ${relativeTime(latest.completed_at)}`
+                : `${scans.length} scan${scans.length !== 1 ? 's' : ''}`}
+          </p>
         </div>
       </div>
 
-      {/* Scan rows */}
-      {scans.length === 0 ? (
-        <div className="border-t px-5 py-5 text-center text-sm text-gray-400">No scans yet</div>
-      ) : expanded && (
-        <div className="border-t overflow-x-auto">
-          <div className="max-h-[13.5rem] overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-50 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                {['Target', 'Status', 'Findings', 'Completed', ''].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {scans.map(s => {
-                const isClickable = s.status === 'completed';
-                return (
-                  <tr key={s.id} onClick={() => isClickable && onView(s)}
-                    className={`transition-colors ${isClickable ? 'cursor-pointer hover:bg-blue-50' : ''}`}>
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-500 max-w-[180px] truncate">
-                      {s.config_json?.scan_subtype === 'k8s' || s.tool_name === 'kubescape'
-                        ? <span className="inline-flex items-center gap-1"><Server className="h-3 w-3 text-green-500" />{s.tool_name}</span>
-                        : targetLabel(s)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {s.status === 'running' || s.status === 'pending' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600">
-                          <RefreshCw className="h-3 w-3 animate-spin" />
-                          {s.status === 'running' ? 'Running…' : 'Pending…'}
-                        </span>
-                      ) : <StatusBadge status={s.status} />}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {s.status === 'completed' ? (
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-gray-800 text-xs">
-                            {s.findings_count}<span className="ml-1 font-normal text-gray-400">total</span>
-                          </span>
-                          {s.config_json?.unique_packages_count != null && (
-                            <span className="text-xs font-semibold text-blue-600">{s.config_json.unique_packages_count} unique</span>
-                          )}
-                        </div>
-                      ) : <span className="text-xs text-gray-500">{s.findings_count}</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-400">
-                      {s.completed_at ? new Date(s.completed_at).toLocaleString() : '—'}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-end gap-1">
-                        {isClickable && <ChevronRight className="h-4 w-4 text-gray-300" />}
-                        {s.status === 'failed' && <span className="text-xs text-red-500" title={s.error_message ?? ''}>Failed</span>}
-                        {isClickable && (
-                          <button onClick={e => onDownload(e, s)} disabled={downloadingId === s.id} title="Download report"
-                            className="rounded p-1 text-gray-300 hover:bg-blue-50 hover:text-blue-500 transition-colors disabled:opacity-40">
-                            {downloadingId === s.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-                          </button>
-                        )}
-                        <button onClick={e => onDelete(e, s)} disabled={deletingId === s.id} title="Delete scan"
-                          className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-40">
-                          {deletingId === s.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Metrics — three columns, fixed width, plain text */}
+      {!isEmpty && (
+        <div className="hidden sm:flex items-center gap-6 shrink-0">
+          <div className="min-w-[52px] text-right">
+            <div className={`text-[15px] font-semibold leading-none tabular-nums ${
+              hasCritical ? 'text-gray-900' : openCount > 0 ? 'text-gray-800' : 'text-gray-300'
+            }`}>
+              {openCount.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[10px] uppercase tracking-wider text-gray-400">Open</div>
           </div>
+          <div className="min-w-[52px] text-right">
+            <div className="text-[15px] font-semibold leading-none text-gray-400 tabular-nums">
+              {closedCount.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[10px] uppercase tracking-wider text-gray-400">Closed</div>
+          </div>
+          {isDependency && (
+            <div className="min-w-[52px] text-right">
+              <div className="text-[15px] font-semibold leading-none text-gray-800 tabular-nums">
+                {fixable.toLocaleString()}
+              </div>
+              <div className="mt-1 text-[10px] uppercase tracking-wider text-gray-400">Fixable</div>
+            </div>
+          )}
         </div>
       )}
-    </div>
+
+      <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-gray-600" />
+    </button>
+  );
+}
+
+/* Small inline svg dots/checks — sized to sit on the baseline */
+function CheckDot({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" className={`h-3 w-3 ${className}`} aria-hidden>
+      <circle cx="6" cy="6" r="5.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M3.5 6.1l1.7 1.7 3.3-3.6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CheckCircleDot({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 14 14" className={className} aria-hidden>
+      <circle cx="7" cy="7" r="6.25" fill="currentColor" opacity="0.12" />
+      <path d="M4.2 7.2l2 2 3.6-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -697,6 +754,7 @@ export default function ProjectDetail() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
+  const [statsByType, setStatsByType] = useState<Record<string, TypeStats>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
@@ -710,23 +768,53 @@ export default function ProjectDetail() {
     setScans(Array.isArray(res) ? res : (res.items ?? res.results ?? []));
   }, [id]);
 
+  const fetchStats = useCallback(async () => {
+    if (!id) return;
+    const results = await Promise.all(
+      SCAN_TYPES.map(async t => {
+        try {
+          const s = await getSummary(id, TYPE_LABEL[t.key]);
+          return [t.key, {
+            total_findings: s.total_findings ?? 0,
+            open_findings: s.open_findings ?? 0,
+            closed_findings: Math.max(0, (s.total_findings ?? 0) - (s.open_findings ?? 0)),
+            critical: s.critical ?? 0,
+            high: s.high ?? 0,
+            medium: s.medium ?? 0,
+            low: s.low ?? 0,
+            fixable_packages: s.fixable_packages ?? 0,
+            no_fix_packages: s.no_fix_packages ?? 0,
+          } as TypeStats] as const;
+        } catch {
+          return [t.key, null] as const;
+        }
+      })
+    );
+    const next: Record<string, TypeStats> = {};
+    for (const [k, v] of results) if (v) next[k] = v;
+    setStatsByType(next);
+  }, [id]);
+
   useEffect(() => {
     if (!id) return;
     (async () => {
       try {
-        const [proj] = await Promise.all([getProject(id), fetchScans()]);
+        const [proj] = await Promise.all([getProject(id), fetchScans(), fetchStats()]);
         setProject(proj);
       } catch { setError('Failed to load project.'); }
       finally { setLoading(false); }
     })();
-  }, [id, fetchScans]);
+  }, [id, fetchScans, fetchStats]);
 
   useEffect(() => {
     const hasActive = scans.some(s => s.status === 'pending' || s.status === 'running');
     if (!hasActive) return;
-    const t = setInterval(fetchScans, 5000);
+    const t = setInterval(() => {
+      fetchScans();
+      fetchStats();
+    }, 5000);
     return () => clearInterval(t);
-  }, [scans, fetchScans]);
+  }, [scans, fetchScans, fetchStats]);
 
   const handleDeleteScan = useCallback((e: React.MouseEvent, scan: Scan) => {
     e.stopPropagation();
@@ -834,46 +922,93 @@ export default function ProjectDetail() {
     scans.filter(s => scanTypeKey(s) === key)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+  const totalScans = scans.length;
+  const totalFindings = scans.reduce((s, x) => s + (x.findings_count || 0), 0);
+  const runningCount = scans.filter(s => s.status === 'pending' || s.status === 'running').length;
+
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-5">
+      {/* Back link */}
+      <button onClick={() => navigate('/projects')}
+        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" /> Projects
+      </button>
+
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between border-b border-gray-200 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-          {project.description && <p className="mt-1 text-sm text-gray-500">{project.description}</p>}
-          {project.repository_url && (
-            <a href={project.repository_url} target="_blank" rel="noopener noreferrer"
-              className="mt-1 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
-              <ExternalLink className="h-3.5 w-3.5" />{project.repository_url}
-            </a>
+          <h1 className="text-2xl font-semibold text-gray-900">{project.name}</h1>
+          {project.description && (
+            <p className="mt-1 text-sm text-gray-500">{project.description}</p>
           )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+            {project.repository_url && (
+              <a href={project.repository_url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 hover:text-gray-800 hover:underline">
+                <ExternalLink className="h-3.5 w-3.5" />
+                {project.repository_url.replace(/^https?:\/\//, '')}
+              </a>
+            )}
+            <span>Created {new Date(project.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+          </div>
         </div>
         <a href="/scans"
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800">
-          <Play className="h-4 w-4" /> New Scan
+          className="inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-black transition-colors">
+          <Play className="h-4 w-4" /> Run scan
         </a>
       </div>
 
-      {/* Scan type blocks */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {SCAN_TYPES.map(type => (
-          <ScanTypeBlock
-            key={type.key}
-            type={type}
-            scans={scansFor(type.key)}
-            onView={s => {
-              const isK8sScan = s.config_json?.scan_subtype === 'k8s' || s.tool_name === 'kubescape';
-              if (isK8sScan) navigate(`/projects/${id}/k8s/${s.id}`);
-              else navigate(`/projects/${id}/scans/${s.id}`);
-            }}
-            onDownload={handleRowDownload}
-            onDelete={handleDeleteScan}
-            onTypeClick={() => navigate(`/projects/${id}/scan-types/${type.key}`)}
-            downloadingId={downloadingId}
-            deletingId={deletingId}
-          />
-        ))}
+      {/* Summary bar */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <span className="text-gray-500">
+          <span className="font-semibold text-gray-900 tabular-nums">{totalScans}</span> {totalScans === 1 ? 'scan' : 'scans'}
+        </span>
+        <span className="text-gray-500">
+          <span className="font-semibold text-gray-900 tabular-nums">{totalFindings.toLocaleString()}</span> findings
+        </span>
+        {runningCount > 0 && (
+          <span className="inline-flex items-center gap-1 text-amber-600">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            {runningCount} running
+          </span>
+        )}
       </div>
+
+      {/* Scan type blocks */}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-gray-900">Scan Types</h2>
+        <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+          {SCAN_TYPES.map(type => (
+            <ScanTypeBlock
+              key={type.key}
+              type={type}
+              scans={scansFor(type.key)}
+              stats={statsByType[type.key]}
+              onView={s => {
+                const isK8sScan = s.config_json?.scan_subtype === 'k8s' || s.tool_name === 'kubescape';
+                if (isK8sScan) navigate(`/projects/${id}/k8s/${s.id}`);
+                else navigate(`/projects/${id}/scans/${s.id}`);
+              }}
+              onDownload={handleRowDownload}
+              onDelete={handleDeleteScan}
+              onTypeClick={() => navigate(`/projects/${id}/scan-types/${type.key}`)}
+              downloadingId={downloadingId}
+              deletingId={deletingId}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* SonarQube integration (optional, per-project) */}
+      {project && (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-gray-900">Integrations</h2>
+          <SonarqubePanel
+            project={project as any}
+            onUpdated={(p) => setProject(prev => prev ? { ...prev, ...p } as any : prev)}
+          />
+        </div>
+      )}
 
       {/* Results Drawer */}
       {selectedScan && (

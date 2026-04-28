@@ -1,0 +1,444 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT s.id) AS value FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.status = 'completed' AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
+      "title": "SBOM Scans",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(s.findings_count), 0) AS value FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.status = 'completed' AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Components",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH components AS (SELECT jsonb_array_elements(s.output_data->'components') AS c FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.output_data IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) SELECT COUNT(*) AS value FROM components WHERE NOT (COALESCE(c->>'purl','') ~ 'pkg:(rpm|deb|apk|alpine)/') AND COALESCE(c->'licenses'->0->'license'->>'id', c->'licenses'->0->>'expression', '') ~ '(GPL|AGPL)'",
+          "refId": "A"
+        }
+      ],
+      "title": "Actionable (App-level GPL/AGPL)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH components AS (SELECT jsonb_array_elements(s.output_data->'components') AS c FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.output_data IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) SELECT COUNT(*) AS value FROM components WHERE NOT (NOT (COALESCE(c->>'purl','') ~ 'pkg:(rpm|deb|apk|alpine)/') AND COALESCE(c->'licenses'->0->'license'->>'id', c->'licenses'->0->>'expression', '') ~ '(GPL|AGPL)')",
+          "refId": "A"
+        }
+      ],
+      "title": "Permissive / OS Packages",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "cyan",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH components AS (SELECT jsonb_array_elements(s.output_data->'components') AS c FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.output_data IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) SELECT COUNT(DISTINCT c->>'type') AS value FROM components",
+          "refId": "A"
+        }
+      ],
+      "title": "Package Types",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH components AS (SELECT jsonb_array_elements(s.output_data->'components') AS c FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.output_data IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) SELECT COALESCE(c->'licenses'->0->'license'->>'id', c->'licenses'->0->>'expression', 'Unknown') AS metric, COUNT(*) AS value FROM components GROUP BY 1 ORDER BY value DESC LIMIT 12",
+          "refId": "A"
+        }
+      ],
+      "title": "License Distribution",
+      "type": "piechart",
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH components AS (SELECT jsonb_array_elements(s.output_data->'components') AS c FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.output_data IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) SELECT COALESCE(c->>'type', 'unknown') AS type, COUNT(*) AS count FROM components GROUP BY 1 ORDER BY count DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Components by Type",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 8,
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH components AS (SELECT s.config_json->>'target' AS image, jsonb_array_elements(s.output_data->'components') AS c FROM scans s WHERE ('${project:raw}' = '$__all' OR s.project_id::text = '${project:raw}') AND s.config_json->>'scan_subtype' = 'sbom' AND s.output_data IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)) SELECT REGEXP_REPLACE(image, '.*/', '') AS image, c->>'name' AS package, c->>'version' AS version, c->>'type' AS type, COALESCE(c->'licenses'->0->'license'->>'id', c->'licenses'->0->>'expression', 'Unknown') AS license FROM components WHERE NOT (COALESCE(c->>'purl','') ~ 'pkg:(rpm|deb|apk|alpine)/') AND COALESCE(c->'licenses'->0->'license'->>'id', c->'licenses'->0->>'expression', '') ~ '(GPL|AGPL)' ORDER BY image, license LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Actionable Components by Image",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "opensentinel",
+    "sbom"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY name",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Project",
+        "multi": false,
+        "name": "project",
+        "options": [],
+        "query": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY name",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SBOM & Licenses",
+  "uid": "opensentinel-sbom",
+  "version": 1
+}

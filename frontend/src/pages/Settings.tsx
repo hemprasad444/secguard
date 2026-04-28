@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Wrench, Users, CheckCircle, XCircle, Shield } from 'lucide-react';
 import api from '../api/client';
 import { useAuthStore } from '../stores/authStore';
+import SonarqubeOrgPanel from '../components/SonarqubeOrgPanel';
 
 /* ---------- Types ---------- */
 
@@ -86,6 +87,9 @@ export default function Settings() {
       {error && (
         <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
       )}
+
+      {/* ---- Integrations ---- */}
+      <SonarqubeOrgPanel />
 
       {/* ---- Tool Configuration ---- */}
       <div className="rounded-lg bg-white shadow">

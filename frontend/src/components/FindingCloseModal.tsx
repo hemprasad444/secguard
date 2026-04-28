@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Shield, CheckCircle, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { closeFinding, reopenFinding, verifyK8sFinding } from '../api/findings';
 import SeverityBadge from './common/SeverityBadge';
 
@@ -86,6 +86,26 @@ export default function FindingCloseModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [verifyMsg, setVerifyMsg] = useState('');
+  const [verifyStartedAt, setVerifyStartedAt] = useState<number | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  // Tick elapsed time during verification (no progress signal from backend; UI shows liveness only).
+  useEffect(() => {
+    if (!verifyStartedAt) return;
+    const id = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - verifyStartedAt) / 1000));
+    }, 250);
+    return () => clearInterval(id);
+  }, [verifyStartedAt]);
+
+  const verifyStage =
+    elapsedSec < 4 ? 'Connecting to cluster…'
+      : elapsedSec < 18 ? 'Running targeted scan…'
+      : elapsedSec < 45 ? 'Analyzing results…'
+      : elapsedSec < 90 ? 'Almost there — large clusters take longer…'
+      : 'Still working — this may take a few minutes…';
+
+  const isVerifying = !!verifyStartedAt;
 
   const rd = finding.raw_data ?? {};
   const isK8s = !!(rd.k8s_resource_kind || rd.finding_type === 'compliance' || rd.finding_type === 'misconfiguration');
@@ -105,6 +125,8 @@ export default function FindingCloseModal({
 
     // K8s "Verify & Close" -runs live re-scan
     if (isK8s && selected.reason === 'manual_fix') {
+      setVerifyStartedAt(Date.now());
+      setElapsedSec(0);
       try {
         const result = await verifyK8sFinding(finding.id);
         if (result.verified) {
@@ -119,6 +141,7 @@ export default function FindingCloseModal({
         const msg = e.response?.data?.message;
         setError(detail || msg || `Verification scan failed: ${e.message || 'network error or timeout'}`);
       }
+      setVerifyStartedAt(null);
       setSubmitting(false);
       return;
     }
@@ -151,7 +174,8 @@ export default function FindingCloseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4"
+      onClick={isVerifying ? undefined : onClose}>
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-start justify-between border-b px-6 py-4">
@@ -172,8 +196,47 @@ export default function FindingCloseModal({
         </div>
 
         <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Verification progress — replaces the form during a K8s verify scan */}
+          {isVerifying ? (
+            <div className="space-y-3 py-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-700">Verifying control</p>
+                  <p className="mt-1 text-[13px] font-mono text-gray-800 truncate">
+                    {(rd.controlID || rd.ID) ?? finding.title}
+                    {rd.k8s_resource_kind && rd.k8s_resource_name && (
+                      <span className="text-gray-500"> · {rd.k8s_resource_kind}/{rd.k8s_resource_name}</span>
+                    )}
+                  </p>
+                </div>
+                <span className="shrink-0 font-mono text-xs text-gray-500 tabular-nums">{elapsedSec}s</span>
+              </div>
+
+              {/* Indeterminate bar — moving segment over a track */}
+              <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="absolute inset-y-0 -left-1/3 w-1/3 rounded-full bg-gray-900"
+                  style={{ animation: 'shimmer 1.4s ease-in-out infinite' }}
+                />
+                <style>{`
+                  @keyframes shimmer {
+                    0%   { transform: translateX(0); }
+                    100% { transform: translateX(400%); }
+                  }
+                `}</style>
+              </div>
+
+              <p className="text-[12px] text-gray-600">{verifyStage}</p>
+
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Re-scanning the cluster for this control. The finding will only be closed if the control
+                now passes — otherwise you'll see why and can pick another close path.
+              </p>
+            </div>
+          ) : null}
+
           {/* Already closed -show info */}
-          {isAlreadyClosed ? (
+          {!isVerifying && isAlreadyClosed ? (
             <div className="space-y-3">
               <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -200,7 +263,7 @@ export default function FindingCloseModal({
                 </div>
               )}
             </div>
-          ) : (
+          ) : !isVerifying ? (
             <>
               {/* Close reason selection */}
               <div className="space-y-2">
@@ -240,15 +303,8 @@ export default function FindingCloseModal({
                 </div>
               )}
 
-              {/* Remediation hint */}
-              {finding.remediation && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-0.5">Recommended Remediation</p>
-                  <p className="text-xs text-amber-700 line-clamp-3">{finding.remediation}</p>
-                </div>
-              )}
             </>
-          )}
+          ) : null}
 
           {verifyMsg && (
             <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2">

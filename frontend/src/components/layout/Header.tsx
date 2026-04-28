@@ -8,7 +8,7 @@ export default function Header() {
     <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
       {/* Left side: page title / breadcrumb */}
       <div className="flex items-center">
-        <h1 className="text-lg font-semibold text-gray-800">SecGuard</h1>
+        <h1 className="text-lg font-semibold text-gray-800">OpenSentinel</h1>
         {user?.org_name && (
           <span className="ml-2 rounded-md bg-gray-100 px-2 py-0.5 text-sm text-gray-600">{user.org_name}</span>
         )}

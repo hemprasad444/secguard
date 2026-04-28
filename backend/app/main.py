@@ -14,6 +14,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.users import router as users_router
 from app.api.settings import router as settings_router
 from app.api.onboarding import router as onboarding_router
+from app.api.organizations import router as organizations_router
 
 # Import all models so they're registered with Base
 import app.models  # noqa: F401
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SecGuard",
+    title="OpenSentinel",
     description="Security Dashboard - Unified security monitoring and scanning platform",
     version="1.0.0",
     lifespan=lifespan,
@@ -54,8 +55,9 @@ app.include_router(dashboard_router)
 app.include_router(users_router)
 app.include_router(settings_router)
 app.include_router(onboarding_router)
+app.include_router(organizations_router)
 
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "secguard"}
+    return {"status": "healthy", "service": "opensentinel"}

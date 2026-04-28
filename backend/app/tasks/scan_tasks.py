@@ -310,3 +310,78 @@ def parse_report_task(self, report_id: str):
             logger.exception(f"Report {report_id} parsing failed")
             report.parsed = False
             session.commit()
+
+
+@celery.task(bind=True, max_retries=0)
+def sync_sonarqube_project_task(self, project_id: str):
+    """Pull SonarQube issues for a project into our findings table.
+
+    Creates a synthetic Scan(tool_name='sonarqube', scan_subtype='sast') so the
+    findings flow through the same UI/dashboard pipes as Semgrep findings.
+    """
+    from app.models.project import Project as ProjectModel
+    from app.integrations.sonarqube import SonarQubeIntegration
+
+    logger.info("Sync SonarQube: project=%s", project_id)
+    with Session(sync_engine) as session:
+        project = session.get(ProjectModel, uuid.UUID(project_id))
+        if not project:
+            logger.error("SonarQube sync: project %s not found", project_id)
+            return
+        if not project.sonarqube_project_key:
+            logger.error("SonarQube sync: project %s has no project key", project_id)
+            return
+
+        # Resolve creds: per-project values win, fall back to org for whatever's missing.
+        url = project.sonarqube_url
+        token = project.sonarqube_token
+        if (not url or not token) and project.org_id:
+            from app.models.organization import Organization as OrgModel
+            org = session.get(OrgModel, project.org_id)
+            if org:
+                if not url:
+                    url = org.sonarqube_url
+                if not token:
+                    token = org.sonarqube_token
+        if not url:
+            logger.error("SonarQube sync: project %s has no URL (project nor org)", project_id)
+            return
+
+        scan = Scan(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            tool_name="sonarqube",
+            scan_type="sast",
+            status="running",
+            started_at=datetime.now(timezone.utc),
+            config_json={
+                "scan_subtype": "sast",
+                "target": project.sonarqube_project_key,
+                "sonarqube_url": url,
+            },
+        )
+        session.add(scan)
+        session.commit()
+
+        try:
+            integration = SonarQubeIntegration(url=url, token=token)
+            findings = integration.run_scan(project.sonarqube_project_key, {})
+            count = _save_findings(
+                session,
+                scan.id,
+                project.id,
+                "sonarqube",
+                findings,
+            )
+            scan.status = "completed"
+            scan.findings_count = count
+            scan.completed_at = datetime.now(timezone.utc)
+            project.sonarqube_last_synced_at = scan.completed_at
+            session.commit()
+            logger.info("SonarQube sync done: project=%s findings=%d", project_id, count)
+        except Exception as exc:
+            logger.exception("SonarQube sync failed for project %s", project_id)
+            scan.status = "failed"
+            scan.error_message = str(exc)[:500]
+            scan.completed_at = datetime.now(timezone.utc)
+            session.commit()

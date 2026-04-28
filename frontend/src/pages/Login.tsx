@@ -42,7 +42,7 @@ export default function Login() {
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100">
             <Shield className="h-8 w-8 text-primary-600" />
           </div>
-          <h1 className="mt-4 text-3xl font-bold text-gray-900">SecGuard</h1>
+          <h1 className="mt-4 text-3xl font-bold text-gray-900">OpenSentinel</h1>
           <p className="mt-1 text-sm text-gray-500">
             Sign in to your security dashboard
           </p>
