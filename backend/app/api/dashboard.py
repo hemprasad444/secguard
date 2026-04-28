@@ -67,7 +67,7 @@ _REVERSE_LABEL_MAP: dict[str, list[tuple]] = {
     "Dependency": [("trivy", "dependency"), ("trivy", None)],
     "Secrets":    [("trivy", "secrets"), ("gitleaks", None), ("gitleaks", "secret")],
     "SBOM":       [("trivy", "sbom"), ("sbom", None)],
-    "SAST":       [("semgrep", None), ("semgrep", "sast")],
+    "SAST":       [("semgrep", None), ("semgrep", "sast"), ("sonarqube", None), ("sonarqube", "sast")],
     "DAST":       [("zap", None), ("zap", "dast")],
     "K8s":        [("kubescape", None), ("kubescape", "k8s"), ("trivy", "k8s")],
 }

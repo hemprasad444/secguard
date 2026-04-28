@@ -1,137 +1,661 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "graphTooltip": 0,
   "id": null,
   "links": [],
   "panels": [
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"fixedColor": "red", "mode": "fixed"}, "unit": "short"}},
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) AND f.severity = 'critical' AND f.status NOT IN ('resolved','accepted','false_positive')", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND f.severity = 'critical' AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
       "title": "K8s Critical",
       "type": "stat"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"fixedColor": "orange", "mode": "fixed"}, "unit": "short"}},
-      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
       "id": 2,
-      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) AND f.severity = 'high' AND f.status NOT IN ('resolved','accepted','false_positive')", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND f.severity = 'high' AND f.status NOT IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
       "title": "K8s High",
       "type": "stat"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "purple", "value": null}]}}},
-      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
       "id": 3,
-      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(DISTINCT f.raw_data->>'k8s_resource_name') AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s'))", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT f.raw_data->>'k8s_resource_name') AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
       "title": "Resources Affected",
       "type": "stat"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
       "id": 4,
-      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(DISTINCT f.raw_data->>'k8s_namespace') AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) AND f.raw_data->>'k8s_namespace' != ''", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT f.raw_data->>'k8s_namespace') AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND f.raw_data->>'k8s_namespace' != '' AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
       "title": "Namespaces",
       "type": "stat"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "cyan", "value": null}]}}},
-      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "cyan",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
       "id": 5,
-      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(DISTINCT COALESCE(f.raw_data->>'controlID', f.raw_data->>'ID')) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s'))", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT COALESCE(f.raw_data->>'controlID', f.raw_data->>'ID')) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
       "title": "Unique Controls Failed",
       "type": "stat"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "unit": "short"}},
-      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
       "id": 6,
-      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) AND f.status IN ('resolved','accepted','false_positive')", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND f.status IN ('resolved','accepted','false_positive') AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST)",
+          "refId": "A"
+        }
+      ],
       "title": "K8s Resolved",
       "type": "stat"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
       "fieldConfig": {
-        "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisPlacement": "auto", "fillOpacity": 80, "gradientMode": "none", "lineWidth": 1}, "unit": "short"},
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1
+          },
+          "unit": "short"
+        },
         "overrides": [
-          {"matcher": {"id": "byName", "options": "critical"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
-          {"matcher": {"id": "byName", "options": "high"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
-          {"matcher": {"id": "byName", "options": "medium"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#EAB839"}}]},
-          {"matcher": {"id": "byName", "options": "low"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#3274D9"}}]}
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "critical"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "high"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#EAB839"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3274D9"
+                }
+              }
+            ]
+          }
         ]
       },
-      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 4},
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
       "id": 7,
       "options": {
         "barWidth": 0.8,
         "groupWidth": 0.7,
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
         "orientation": "horizontal",
         "showValue": "auto",
         "stacking": "normal",
-        "tooltip": {"mode": "multi"},
+        "tooltip": {
+          "mode": "multi"
+        },
         "xTickLabelRotation": 0
       },
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT COALESCE(NULLIF(f.raw_data->>'k8s_namespace',''), 'cluster-wide') AS namespace, COUNT(*) FILTER (WHERE f.severity = 'critical') AS critical, COUNT(*) FILTER (WHERE f.severity = 'high') AS high, COUNT(*) FILTER (WHERE f.severity = 'medium') AS medium, COUNT(*) FILTER (WHERE f.severity = 'low') AS low FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 10", "refId": "A"}],
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(NULLIF(f.raw_data->>'k8s_namespace',''), 'cluster-wide') AS namespace, COUNT(*) FILTER (WHERE f.severity = 'critical') AS critical, COUNT(*) FILTER (WHERE f.severity = 'high') AS high, COUNT(*) FILTER (WHERE f.severity = 'medium') AS medium, COUNT(*) FILTER (WHERE f.severity = 'low') AS low FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST) GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
       "title": "Findings by Namespace (Top 10)",
       "type": "barchart"
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}},
-      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 4},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
       "id": 8,
       "options": {
-        "legend": {"displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"]},
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
         "pieType": "pie",
-        "reduceOptions": {"calcs": ["lastNotNull"]},
-        "tooltip": {"mode": "single"}
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT f.raw_data->>'k8s_resource_kind' AS metric, COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) AND f.raw_data->>'k8s_resource_kind' IS NOT NULL GROUP BY 1 ORDER BY value DESC", "refId": "A"}],
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT f.raw_data->>'k8s_resource_kind' AS metric, COUNT(*) AS value FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND f.raw_data->>'k8s_resource_kind' IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST) GROUP BY 1 ORDER BY value DESC",
+          "refId": "A"
+        }
+      ],
       "title": "Resource Kind Distribution",
-      "type": "piechart"
+      "type": "piechart",
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "metric",
+                "handlerKey": "field.name"
+              },
+              {
+                "fieldName": "value",
+                "handlerKey": "field.value"
+              }
+            ]
+          }
+        }
+      ]
     },
     {
-      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
       "fieldConfig": {
-        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}}},
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
         "overrides": [
-          {"matcher": {"id": "byName", "options": "severity"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "mappings", "value": [{"type": "value", "options": {"critical": {"color": "red"}, "high": {"color": "orange"}, "medium": {"color": "#EAB839"}, "low": {"color": "#3274D9"}}}]}]}
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "severity"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": {
+                        "color": "red"
+                      },
+                      "high": {
+                        "color": "orange"
+                      },
+                      "medium": {
+                        "color": "#EAB839"
+                      },
+                      "low": {
+                        "color": "#3274D9"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
         ]
       },
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 14},
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "id": 9,
-      "options": {"showHeader": true, "footer": {"show": false}},
-      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "format": "table", "rawQuery": true, "rawSql": "SELECT f.raw_data->>'k8s_resource_kind' AS kind, f.raw_data->>'k8s_resource_name' AS name, COALESCE(NULLIF(f.raw_data->>'k8s_namespace',''), 'cluster-wide') AS namespace, COUNT(*) FILTER (WHERE f.severity = 'critical') AS critical, COUNT(*) FILTER (WHERE f.severity = 'high') AS high, COUNT(*) FILTER (WHERE f.severity = 'medium') AS medium, COUNT(*) AS total FROM findings f JOIN scans s ON s.id = f.scan_id WHERE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) AND f.raw_data->>'k8s_resource_kind' IS NOT NULL GROUP BY 1,2,3 ORDER BY critical DESC, high DESC, total DESC LIMIT 20", "refId": "A"}],
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT f.raw_data->>'k8s_resource_kind' AS kind, f.raw_data->>'k8s_resource_name' AS name, COALESCE(NULLIF(f.raw_data->>'k8s_namespace',''), 'cluster-wide') AS namespace, COUNT(*) FILTER (WHERE f.severity = 'critical') AS critical, COUNT(*) FILTER (WHERE f.severity = 'high') AS high, COUNT(*) FILTER (WHERE f.severity = 'medium') AS medium, COUNT(*) AS total FROM findings f JOIN scans s ON s.id = f.scan_id WHERE ('${project:raw}' = '$__all' OR f.project_id::text = '${project:raw}') AND (CASE WHEN '${tool:raw}' = 'kubescape' THEN s.tool_name = 'kubescape' WHEN '${tool:raw}' = 'trivy' THEN (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s') ELSE (s.tool_name = 'kubescape' OR (s.tool_name = 'trivy' AND s.config_json->>'scan_subtype' = 'k8s')) END) AND f.raw_data->>'k8s_resource_kind' IS NOT NULL AND s.id IN (SELECT DISTINCT ON (project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), '')) id FROM scans WHERE status = 'completed' ORDER BY project_id, COALESCE(config_json->>'scan_subtype',''), tool_name, COALESCE(REGEXP_REPLACE(config_json->>'target', ':[^:/]+$', ''), ''), completed_at DESC NULLS LAST) GROUP BY 1,2,3 ORDER BY critical DESC, high DESC, total DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
       "title": "Top Risky Resources",
       "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["secguard", "k8s"],
-  "templating": {"list": []},
-  "time": {"from": "now-30d", "to": "now"},
+  "tags": [
+    "opensentinel",
+    "k8s"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY name",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Project",
+        "multi": false,
+        "name": "project",
+        "options": [],
+        "query": "SELECT name AS __text, id::text AS __value FROM projects ORDER BY name",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "Both",
+          "value": "both"
+        },
+        "description": "Kubescape = compliance checks | Trivy = misconfigurations",
+        "hide": 0,
+        "includeAll": false,
+        "label": "View",
+        "multi": false,
+        "name": "tool",
+        "options": [
+          {
+            "selected": true,
+            "text": "Both",
+            "value": "both"
+          },
+          {
+            "selected": false,
+            "text": "Compliance (Kubescape)",
+            "value": "kubescape"
+          },
+          {
+            "selected": false,
+            "text": "Misconfig (Trivy)",
+            "value": "trivy"
+          }
+        ],
+        "query": "both,kubescape,trivy",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "K8s Security Posture",
-  "uid": "secguard-k8s",
+  "uid": "opensentinel-k8s",
   "version": 1,
   "weekStart": ""
 }

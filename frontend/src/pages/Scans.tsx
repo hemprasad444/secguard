@@ -114,7 +114,7 @@ function scanCategory(scan: Scan): CategoryKey {
     if (sub === 'k8s') return 'k8s';
     return 'dependency';
   }
-  if (scan.tool_name === 'semgrep') return 'sast';
+  if (scan.tool_name === 'semgrep' || scan.tool_name === 'sonarqube') return 'sast';
   if (scan.tool_name === 'zap') return 'dast';
   if (scan.tool_name === 'kubescape') return 'k8s';
   return 'dependency';

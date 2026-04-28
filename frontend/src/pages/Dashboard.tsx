@@ -73,40 +73,27 @@ const SCAN_LUCIDE_ICONS: Record<string, React.ElementType> = {
 const CMP_A = '#6366f1';
 const CMP_B = '#ec4899';
 
-// ── Stat Card ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, accent, icon: Icon, sub }: {
-  label: string; value: number; accent: string; icon: React.ElementType; sub?: string;
+// ── Stat Card (Grafana-style) ─────────────────────────────────────────────────
+function StatCard({ label, value, accent, sub }: {
+  label: string; value: number; accent: string; icon?: React.ElementType; sub?: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 border-t-4"
-      style={{ borderTopColor: accent }}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">{label}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {value.toLocaleString()}
-          </p>
-          {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
-        </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ background: accent + '18' }}>
-          <Icon className="h-5 w-5" style={{ color: accent }} />
-        </div>
-      </div>
+    <div className="relative overflow-hidden rounded bg-white border border-gray-200 px-4 py-3">
+      <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</p>
+      <p className="mt-1 text-3xl font-semibold text-gray-900" style={{ fontVariantNumeric: 'tabular-nums', color: accent, lineHeight: '1.1' }}>
+        {value.toLocaleString()}
+      </p>
+      {sub && <p className="mt-0.5 text-[10px] text-gray-400 uppercase tracking-wider">{sub}</p>}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: accent }} />
     </div>
   );
 }
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 border-t-4 border-t-gray-100">
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <div className="h-2.5 w-20 rounded-full bg-gray-100" />
-          <div className="h-7 w-24 rounded-lg bg-gray-100" />
-        </div>
-        <div className="h-10 w-10 rounded-xl bg-gray-100" />
-      </div>
+    <div className="animate-pulse rounded bg-white border border-gray-200 p-3">
+      <div className="h-2 w-16 bg-gray-100" />
+      <div className="mt-2 h-7 w-20 bg-gray-100" />
     </div>
   );
 }

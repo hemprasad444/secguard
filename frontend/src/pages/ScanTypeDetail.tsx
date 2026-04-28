@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
-  ArrowLeft, Download, Filter, ArrowUpDown, RefreshCw, X,
+  ArrowLeft, Download, Filter, ArrowUpDown, RefreshCw, X, Search,
   Shield, Lock, FileText, Code, Globe, Server, Trash2, FileDown, ChevronRight, Play,
 } from 'lucide-react';
 import { getScans, getScanFindings, getScanSbom, deleteScan, triggerScan } from '../api/scans';
@@ -63,7 +63,7 @@ function scanTypeKey(scan: Scan): string {
   if (sub === 'secrets') return 'secrets';
   if (sub === 'sbom') return 'sbom';
   if (sub === 'k8s') return 'k8s';
-  if (scan.tool_name === 'semgrep') return 'sast';
+  if (scan.tool_name === 'semgrep' || scan.tool_name === 'sonarqube') return 'sast';
   if (scan.tool_name === 'zap') return 'dast';
   if (scan.tool_name === 'kubescape') return 'k8s';
   return 'dependency';
@@ -674,6 +674,10 @@ export default function ScanTypeDetail() {
   const [deletingAll, setDeletingAll] = useState(false);
   const [showRescanModal, setShowRescanModal] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [imageSearch, setImageSearch] = useState('');
+  const [sortKey, setSortKey] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'fixable-desc' | 'nofix-desc' | 'count-desc' | 'status'>('date-desc');
+  const [latestOnly, setLatestOnly] = useState(true);
+  const [expandedBases, setExpandedBases] = useState<Set<string>>(new Set());
 
   const fetchScans = useCallback(async () => {
     if (!projectId) return;
@@ -810,45 +814,183 @@ export default function ScanTypeDetail() {
     setDownloadingId(null);
   }, []);
 
+  const failedCount = scans.filter(s => s.status === 'failed').length;
+  const runningCount = scans.filter(s => s.status === 'pending' || s.status === 'running').length;
+  const completedCount = scans.filter(s => s.status === 'completed').length;
+  const isK8sSection = typeKey === 'k8s';
+
+  // Search + sort
+  const searchKey = (s: Scan) =>
+    (scanTypeKey(s) === 'k8s' ? s.tool_name : targetLabel(s)).toLowerCase();
+
+  // Base image key (strip tag for dependency/secrets/sbom images; K8s uses tool name)
+  const baseKey = (s: Scan) => {
+    if (scanTypeKey(s) === 'k8s') return s.tool_name;
+    const t = (s.config_json?.target as string) ?? targetLabel(s);
+    return (t.split(':')[0] || t).toLowerCase();
+  };
+
+  // Exact-target key — used to collapse identical re-scans (same image:tag, different run times)
+  const exactTargetKey = (s: Scan) => {
+    if (scanTypeKey(s) === 'k8s') return s.tool_name;
+    return (s.config_json?.target as string) ?? targetLabel(s);
+  };
+
+  const statusRank: Record<string, number> = { running: 0, pending: 1, failed: 2, completed: 3 };
+
+  // Step 1: collapse same-exact-target re-scans — keep only the most recent per (image:tag).
+  // This is the user's real mental model: "the image itself", not "every time we ran scan on it".
+  const latestPerExactTarget = new Map<string, Scan>();
+  for (const s of scans) {
+    const k = exactTargetKey(s);
+    const prev = latestPerExactTarget.get(k);
+    if (!prev) { latestPerExactTarget.set(k, s); continue; }
+    const prevTs = new Date(prev.completed_at ?? prev.created_at ?? '').getTime();
+    const curTs = new Date(s.completed_at ?? s.created_at ?? '').getTime();
+    if (curTs > prevTs) latestPerExactTarget.set(k, s);
+  }
+  const tagUniqueScans = [...latestPerExactTarget.values()];
+
+  const sortedFiltered = tagUniqueScans
+    .filter(s => !imageSearch || searchKey(s).includes(imageSearch.toLowerCase()))
+    .sort((a, b) => {
+      switch (sortKey) {
+        case 'date-desc':
+          return new Date(b.completed_at ?? b.created_at ?? '').getTime() - new Date(a.completed_at ?? a.created_at ?? '').getTime();
+        case 'date-asc':
+          return new Date(a.completed_at ?? a.created_at ?? '').getTime() - new Date(b.completed_at ?? b.created_at ?? '').getTime();
+        case 'name-asc':
+          return searchKey(a).localeCompare(searchKey(b));
+        case 'name-desc':
+          return searchKey(b).localeCompare(searchKey(a));
+        case 'fixable-desc':
+          return ((b.config_json?.fixable_count ?? 0) as number)
+               - ((a.config_json?.fixable_count ?? 0) as number);
+        case 'nofix-desc':
+          return ((b.config_json?.no_fix_count ?? 0) as number)
+               - ((a.config_json?.no_fix_count ?? 0) as number);
+        case 'count-desc':
+          return (b.findings_count ?? 0) - (a.findings_count ?? 0);
+        case 'status':
+          return (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
+        default:
+          return 0;
+      }
+    });
+
+  // Build per-base history (always newest first within a base) so we can show "N older" chips
+  const baseHistory = new Map<string, Scan[]>();
+  for (const s of sortedFiltered) {
+    const k = baseKey(s);
+    const arr = baseHistory.get(k) ?? [];
+    arr.push(s);
+    baseHistory.set(k, arr);
+  }
+  for (const [, arr] of baseHistory) {
+    arr.sort((a, b) => new Date(b.completed_at ?? b.created_at ?? '').getTime() - new Date(a.completed_at ?? a.created_at ?? '').getTime());
+  }
+
+  // visibleScans: when latestOnly, emit only the freshest-per-base (plus expanded siblings).
+  const visibleScans: Scan[] = [];
+  const seenBases = new Set<string>();
+  for (const s of sortedFiltered) {
+    const k = baseKey(s);
+    if (!latestOnly) { visibleScans.push(s); continue; }
+    if (seenBases.has(k)) {
+      // Only include if this base is expanded
+      if (expandedBases.has(k)) visibleScans.push(s);
+      continue;
+    }
+    seenBases.add(k);
+    visibleScans.push(s);
+  }
+
+  const toggleBase = (k: string) => {
+    setExpandedBases(prev => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  };
+
+  // Column layout per scan type
+  //   dependency   : Image | Status | Fixable | No fix | Completed | Actions  (6 cols)
+  //   k8s          : Tool  | Status | Findings | Severity | Completed | Actions  (6 cols)
+  //   secrets/sbom : Image | Status | <Count>  |           Completed | Actions  (5 cols)
+  const countLabel =
+    typeKey === 'secrets' ? 'Secrets'
+      : typeKey === 'sbom' ? 'Components'
+      : typeKey === 'sast' ? 'Issues'
+      : typeKey === 'dast' ? 'Issues'
+      : 'Findings';
+  const isDependency = typeKey === 'dependency';
+  const gridCols = isDependency
+    ? 'grid-cols-[minmax(0,1fr)_100px_100px_100px_170px_72px]'
+    : isK8sSection
+      ? 'grid-cols-[minmax(0,1fr)_100px_100px_160px_170px_72px]'
+      : 'grid-cols-[minmax(0,1fr)_100px_100px_170px_72px]';
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Breadcrumb */}
-      <div>
-        <button onClick={() => navigate(`/projects/${projectId}`)}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
-          <ArrowLeft className="h-4 w-4" />
-          {projectName || 'Back to Project'}
-        </button>
-      </div>
+      <button onClick={() => navigate(`/projects/${projectId}`)}
+        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {projectName || 'Back to project'}
+      </button>
 
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${typeInfo.colorBg}`}>
-          <Icon className={`h-6 w-6 ${typeInfo.colorIcon}`} />
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-5">
+        <div className="flex items-start gap-3 min-w-0">
+          <Icon className="h-5 w-5 shrink-0 text-gray-500 mt-0.5" strokeWidth={1.75} />
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wider text-gray-400">Scan type</p>
+            <h1 className="mt-0.5 text-lg font-semibold text-gray-900">{typeInfo.label}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              <span>
+                <span className="font-semibold text-gray-900 tabular-nums">{scans.length}</span> scan{scans.length !== 1 ? 's' : ''}
+              </span>
+              {completedCount > 0 && (
+                <span>
+                  <span className="font-semibold text-gray-900 tabular-nums">{completedCount}</span> completed
+                </span>
+              )}
+              {runningCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-amber-700">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <span className="font-semibold tabular-nums">{runningCount}</span> running
+                </span>
+              )}
+              {failedCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-gray-500">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  <span className="font-semibold text-gray-900 tabular-nums">{failedCount}</span> failed
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{typeInfo.label}</h1>
-          <p className="text-sm text-gray-400">{scans.length} scan{scans.length !== 1 ? 's' : ''} total</p>
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {typeKey !== 'k8s' && scans.some(s => s.status === 'failed') && (
+
+        {/* Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {typeKey !== 'k8s' && failedCount > 0 && (
             <button onClick={() => setShowRescanModal(true)} disabled={deletingFailed || deletingAll}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
-              <Play className="h-3.5 w-3.5" /> Rescan failed ({scans.filter(s => s.status === 'failed').length})
+              className="inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-black transition-colors disabled:opacity-50">
+              <Play className="h-3.5 w-3.5" /> Rescan failed ({failedCount})
             </button>
           )}
-          {scans.some(s => s.status === 'failed') && (
+          {failedCount > 0 && (
             <button onClick={deleteAllFailed} disabled={deletingFailed || deletingAll}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
               {deletingFailed
                 ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Deleting…</>
-                : <><Trash2 className="h-3.5 w-3.5" /> Delete failed ({scans.filter(s => s.status === 'failed').length})</>
+                : <><Trash2 className="h-3.5 w-3.5" /> Delete failed</>
               }
             </button>
           )}
           {scans.length > 0 && (
             <button onClick={() => setConfirmDeleteAll(true)} disabled={deletingAll || deletingFailed}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
               {deletingAll
                 ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Deleting…</>
                 : <><Trash2 className="h-3.5 w-3.5" /> Delete all</>
@@ -856,135 +998,267 @@ export default function ScanTypeDetail() {
             </button>
           )}
           <button onClick={fetchScans}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </button>
         </div>
       </div>
 
-      {/* Scans table */}
+      {/* Toolbar — search + sort */}
+      {!loading && scans.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              type="text"
+              value={imageSearch}
+              onChange={e => setImageSearch(e.target.value)}
+              placeholder={isK8sSection ? 'Search by tool…' : 'Search by image name…'}
+              className="w-full rounded-md border border-gray-200 bg-white pl-8 pr-2 py-1.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+            />
+          </div>
+          <div className="inline-flex items-center gap-1.5">
+            <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+            <select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value as typeof sortKey)}
+              className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400"
+            >
+              <option value="date-desc">Newest first</option>
+              <option value="date-asc">Oldest first</option>
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+              {isDependency && (
+                <>
+                  <option value="fixable-desc">Most fixable</option>
+                  <option value="nofix-desc">Most no-fix</option>
+                </>
+              )}
+              {!isDependency && (
+                <option value="count-desc">Most {countLabel.toLowerCase()}</option>
+              )}
+              <option value="status">By status</option>
+            </select>
+          </div>
+          {imageSearch && (
+            <span className="text-[11px] text-gray-500 tabular-nums">
+              {visibleScans.length} of {scans.length}
+            </span>
+          )}
+          <label className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={latestOnly}
+              onChange={e => setLatestOnly(e.target.checked)}
+              className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0"
+            />
+            Latest per image only
+          </label>
+        </div>
+      )}
+
+      {/* Scans list */}
       {loading ? (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />)}
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-12 animate-pulse rounded-md bg-gray-100" />)}
         </div>
       ) : scans.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 py-16 text-center text-sm text-gray-400">
+        <div className="rounded-md border border-dashed border-gray-200 py-14 text-center text-sm text-gray-400">
           No {typeInfo.label.toLowerCase()} scans yet
         </div>
+      ) : visibleScans.length === 0 ? (
+        <div className="rounded-md border border-dashed border-gray-200 py-14 text-center text-sm text-gray-400">
+          No scans match "{imageSearch}"
+        </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-100 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                {typeKey === 'k8s'
-                  ? ['Tool', 'Status', 'Findings', 'Severity', 'Completed', ''].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">{h}</th>
-                    ))
-                  : ['Target / Image', 'Status', 'Fixable Pkgs', 'No Fix Pkgs', 'Completed', ''].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">{h}</th>
-                    ))
-                }
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {scans.map(s => {
-                const isClickable = s.status === 'completed';
-                const isRunning = s.status === 'pending' || s.status === 'running';
-                const isK8sScan = s.config_json?.scan_subtype === 'k8s' || s.tool_name === 'kubescape';
-                return (
-                  <tr key={s.id}
-                    onClick={() => isClickable && (isK8sScan ? navigate(`/projects/${projectId}/k8s/${s.id}`) : navigate(`/projects/${projectId}/scans/${s.id}`))}
-                    className={`transition-colors ${isClickable ? 'cursor-pointer hover:bg-blue-50' : ''} ${s.status === 'failed' ? 'bg-red-50/60' : ''}`}>
-                    <td className="px-5 py-3.5 max-w-[260px]">
-                      {isK8sScan ? (
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                            <Server className="h-3 w-3" />
-                            {s.tool_name.charAt(0).toUpperCase() + s.tool_name.slice(1)}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="block font-mono text-xs text-gray-700 truncate">{targetLabel(s)}</span>
-                      )}
-                      {s.status === 'failed' && s.error_message && (
-                        <details className="mt-0.5">
-                          <summary className="cursor-pointer truncate text-xs text-red-500 hover:text-red-700 list-none">
-                            {s.error_message.length > 80 ? s.error_message.slice(0, 80) + '…  (click to expand)' : s.error_message}
-                          </summary>
-                          <p className="mt-1 whitespace-pre-wrap break-all rounded bg-red-50 p-2 text-xs text-red-700 font-mono">
-                            {s.error_message}
-                          </p>
-                        </details>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {isRunning ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600">
-                          <RefreshCw className="h-3 w-3 animate-spin" />
-                          {s.status === 'running' ? 'Running…' : 'Pending…'}
-                        </span>
-                      ) : <StatusBadge status={s.status} />}
-                    </td>
+        <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+          {/* Column headers — matching row grid template */}
+          <div className={`hidden md:grid ${gridCols} items-center gap-3 border-b border-gray-100 bg-gray-50/60 px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-gray-400`}>
+            <span>{isK8sSection ? 'Tool' : 'Image'}</span>
+            <span className="text-right">Status</span>
+            {isDependency ? (
+              <>
+                <span className="text-right">Fixable</span>
+                <span className="text-right">No fix</span>
+              </>
+            ) : isK8sSection ? (
+              <>
+                <span className="text-right">Findings</span>
+                <span>Severity</span>
+              </>
+            ) : (
+              <span className="text-right">{countLabel}</span>
+            )}
+            <span className="text-right">Completed</span>
+            <span />
+          </div>
+
+          {visibleScans.map(s => {
+            const isClickable = s.status === 'completed';
+            const isRunning = s.status === 'pending' || s.status === 'running';
+            const isK8sScan = s.config_json?.scan_subtype === 'k8s' || s.tool_name === 'kubescape';
+
+            const statusText =
+              s.status === 'completed' ? <span className="text-emerald-700">Completed</span>
+              : s.status === 'failed' ? <span className="text-red-600">Failed</span>
+              : s.status === 'running' ? <span className="inline-flex items-center gap-1 text-amber-700"><RefreshCw className="h-3 w-3 animate-spin" /> Running</span>
+              : <span className="text-amber-700">Pending</span>;
+
+            const handleRowClick = () => {
+              if (!isClickable) return;
+              if (isK8sScan) navigate(`/projects/${projectId}/k8s/${s.id}`);
+              else navigate(`/projects/${projectId}/scans/${s.id}`);
+            };
+
+            const completedDate = s.completed_at
+              ? new Date(s.completed_at).toLocaleString(undefined, {
+                  year: 'numeric', month: 'short', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })
+              : '—';
+
+            return (
+              <div
+                key={s.id}
+                onClick={handleRowClick}
+                className={`group grid ${gridCols} items-center gap-3 border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 ${
+                  isClickable ? 'cursor-pointer hover:bg-gray-50/60' : ''
+                }`}
+              >
+                {/* Image / Tool name */}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     {isK8sScan ? (
-                      <>
-                        <td className="px-5 py-3.5">
-                          {s.status === 'completed'
-                            ? <span className="font-semibold text-gray-800">{s.findings_count}</span>
-                            : <span className="text-gray-400">—</span>}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {s.status === 'completed' && s.findings_count > 0 ? (
-                            <div className="flex items-center gap-1">
-                              {(s.config_json?.severity_critical ?? 0) > 0 && <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">{s.config_json?.severity_critical}C</span>}
-                              {(s.config_json?.severity_high ?? 0) > 0 && <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">{s.config_json?.severity_high}H</span>}
-                              {(s.config_json?.severity_medium ?? 0) > 0 && <span className="rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-bold text-yellow-700">{s.config_json?.severity_medium}M</span>}
-                              {(s.config_json?.severity_low ?? 0) > 0 && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">{s.config_json?.severity_low}L</span>}
-                              {!s.config_json?.severity_critical && !s.config_json?.severity_high && !s.config_json?.severity_medium && !s.config_json?.severity_low && (
-                                <span className="text-xs text-gray-400">{s.findings_count} total</span>
-                              )}
-                            </div>
-                          ) : <span className="text-gray-400">—</span>}
-                        </td>
-                      </>
+                      <span className="text-sm font-medium text-gray-900 capitalize">{s.tool_name}</span>
                     ) : (
-                      <>
-                        <td className="px-5 py-3.5">
-                          {s.status === 'completed' && s.config_json?.fixable_count != null
-                            ? <span className="font-semibold text-green-600">{s.config_json.fixable_count}</span>
-                            : <span className="text-gray-400">—</span>}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {s.status === 'completed' && s.config_json?.no_fix_count != null
-                            ? <span className="font-semibold text-red-500">{s.config_json.no_fix_count}</span>
-                            : <span className="text-gray-400">—</span>}
-                        </td>
-                      </>
+                      <span className="block font-mono text-[12px] text-gray-800 truncate">{targetLabel(s)}</span>
                     )}
-                    <td className="px-5 py-3.5 text-xs text-gray-400 whitespace-nowrap">
-                      {s.completed_at ? new Date(s.completed_at).toLocaleString() : '—'}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-end gap-1">
-                        {isClickable && <ChevronRight className="h-4 w-4 text-gray-300" />}
-                        {isClickable && (
-                          <button onClick={e => handleDownload(e, s)} disabled={downloadingId === s.id}
-                            title="Download report"
-                            className="rounded p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition-colors disabled:opacity-40">
-                            {downloadingId === s.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                    {(() => {
+                      const bk = baseKey(s);
+                      const history = baseHistory.get(bk) ?? [];
+                      const isLatest = history[0]?.id === s.id;
+                      const olderCount = history.length - 1;
+                      if (latestOnly && isLatest && olderCount > 0) {
+                        const isOpen = expandedBases.has(bk);
+                        return (
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleBase(bk); }}
+                            className="shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:border-gray-400 hover:text-gray-800 transition-colors"
+                            title={isOpen ? 'Hide older versions' : `Show ${olderCount} older version${olderCount !== 1 ? 's' : ''}`}
+                          >
+                            {isOpen ? '− hide history' : `+ ${olderCount} older`}
                           </button>
-                        )}
-                        <button onClick={e => handleDelete(e, s)} disabled={deletingId === s.id}
-                          title="Delete scan"
-                          className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-40">
-                          {deletingId === s.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        );
+                      }
+                      if (latestOnly && !isLatest) {
+                        return (
+                          <span className="shrink-0 text-[10px] uppercase tracking-wider text-gray-400">previous</span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                  {s.status === 'failed' && s.error_message && (
+                    <details className="mt-0.5">
+                      <summary className="cursor-pointer truncate text-[11px] text-red-600 hover:text-red-700 list-none">
+                        {s.error_message.length > 80 ? s.error_message.slice(0, 80) + '…' : s.error_message}
+                      </summary>
+                      <p className="mt-1 whitespace-pre-wrap break-all rounded bg-gray-50 border border-gray-200 p-2 text-[11px] text-gray-700 font-mono">
+                        {s.error_message}
+                      </p>
+                    </details>
+                  )}
+                </div>
+
+                {/* Status */}
+                <div className="hidden md:block text-right text-xs">
+                  {statusText}
+                </div>
+
+                {/* Count/severity columns — layout depends on section type */}
+                {isDependency ? (
+                  <>
+                    <div className="hidden md:block text-right">
+                      {s.status === 'completed' && s.config_json?.fixable_count != null
+                        ? <span className="font-mono text-[12px] text-emerald-700 tabular-nums">{s.config_json.fixable_count}</span>
+                        : <span className="text-[11px] text-gray-300">—</span>}
+                    </div>
+                    <div className="hidden md:block text-right">
+                      {s.status === 'completed' && s.config_json?.no_fix_count != null
+                        ? <span className="font-mono text-[12px] text-gray-700 tabular-nums">{s.config_json.no_fix_count}</span>
+                        : <span className="text-[11px] text-gray-300">—</span>}
+                    </div>
+                  </>
+                ) : isK8sSection ? (
+                  <>
+                    <div className="hidden md:block text-right">
+                      {s.status === 'completed'
+                        ? <span className="font-mono text-[12px] text-gray-800 tabular-nums">{s.findings_count}</span>
+                        : <span className="text-[11px] text-gray-300">—</span>}
+                    </div>
+                    <div className="hidden md:block">
+                      {s.status === 'completed' && s.findings_count > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                          {(s.config_json?.severity_critical ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-1 text-gray-600">
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                              <span className="tabular-nums font-semibold">{s.config_json?.severity_critical}</span>
+                            </span>
+                          )}
+                          {(s.config_json?.severity_high ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-1 text-gray-600">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              <span className="tabular-nums font-semibold">{s.config_json?.severity_high}</span>
+                            </span>
+                          )}
+                          {(s.config_json?.severity_medium ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-1 text-gray-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                              <span className="tabular-nums font-semibold">{s.config_json?.severity_medium}</span>
+                            </span>
+                          )}
+                          {(s.config_json?.severity_low ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-1 text-gray-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                              <span className="tabular-nums font-semibold">{s.config_json?.severity_low}</span>
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-[11px] text-gray-300">—</span>}
+                    </div>
+                  </>
+                ) : (
+                  <div className="hidden md:block text-right">
+                    {s.status === 'completed'
+                      ? <span className="font-mono text-[12px] text-gray-800 tabular-nums">{s.findings_count}</span>
+                      : <span className="text-[11px] text-gray-300">—</span>}
+                  </div>
+                )}
+
+                {/* Completed timestamp */}
+                <div className="hidden md:block text-right text-[11px] text-gray-500 font-mono tabular-nums whitespace-nowrap">
+                  {completedDate}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-0.5">
+                  {isClickable && (
+                    <button onClick={e => handleDownload(e, s)} disabled={downloadingId === s.id}
+                      title="Download report"
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-40">
+                      {downloadingId === s.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                    </button>
+                  )}
+                  <button onClick={e => handleDelete(e, s)} disabled={deletingId === s.id}
+                    title="Delete scan"
+                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-40">
+                    {deletingId === s.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  </button>
+                  {isClickable && <ChevronRight className="h-4 w-4 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-gray-600" />}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

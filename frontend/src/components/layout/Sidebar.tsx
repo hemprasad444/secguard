@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
   Shield,
-  LayoutDashboard,
   BarChart3,
   FolderGit2,
   Scan,
@@ -19,8 +18,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/',           label: 'Dashboard',  icon: LayoutDashboard },
-  { to: '/analytics',  label: 'Analytics',  icon: BarChart3 },
+  { to: '/',           label: 'Analytics',  icon: BarChart3 },
   { to: '/projects',   label: 'Projects',   icon: FolderGit2 },
   { to: '/scans',      label: 'Scans',      icon: Scan },
   { to: '/findings',   label: 'Findings',   icon: Bug },
@@ -36,7 +34,7 @@ export default function Sidebar() {
       {/* Logo / Title */}
       <div className="flex h-16 items-center gap-2 px-6">
         <Shield className="h-7 w-7 text-primary-400" />
-        <span className="text-xl font-bold tracking-tight">SecGuard</span>
+        <span className="text-xl font-bold tracking-tight">OpenSentinel</span>
       </div>
 
       {/* Navigation links */}

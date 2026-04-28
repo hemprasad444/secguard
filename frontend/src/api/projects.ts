@@ -51,3 +51,25 @@ export const uploadKubeconfig = async (projectId: string, file: File) => {
 export const deleteKubeconfig = async (projectId: string) => {
   await api.delete(`/projects/${projectId}/kubeconfig`);
 };
+
+export const configureSonarqube = async (
+  projectId: string,
+  body: { url: string; project_key: string; token?: string },
+) => {
+  const { data } = await api.put(`/projects/${projectId}/sonarqube`, body);
+  return data;
+};
+
+export const removeSonarqube = async (projectId: string) => {
+  await api.delete(`/projects/${projectId}/sonarqube`);
+};
+
+export const testSonarqube = async (projectId: string) => {
+  const { data } = await api.post(`/projects/${projectId}/sonarqube/test`);
+  return data as { ok: boolean; detail: string };
+};
+
+export const syncSonarqube = async (projectId: string) => {
+  const { data } = await api.post(`/projects/${projectId}/sonarqube/sync`);
+  return data as { task_id: string; status: string };
+};

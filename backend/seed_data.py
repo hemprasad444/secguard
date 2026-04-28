@@ -27,37 +27,37 @@ def seed():
     with Session(engine) as session:
         # Create organization
         org = Organization(
-            name="SecGuard Demo",
-            slug="secguard-demo",
-            description="Demo organization for SecGuard",
+            name="OpenSentinel Demo",
+            slug="opensentinel-demo",
+            description="Demo organization for OpenSentinel",
         )
         session.add(org)
         session.flush()
 
         # Create users (all in the demo org)
         admin = User(
-            email="admin@secguard.io",
+            email="admin@opensentinel.io",
             name="Admin User",
             password_hash=hash_password("admin123"),
             role="admin",
             org_id=org.id,
         )
         engineer = User(
-            email="engineer@secguard.io",
+            email="engineer@opensentinel.io",
             name="Security Engineer",
             password_hash=hash_password("engineer123"),
             role="security_engineer",
             org_id=org.id,
         )
         developer = User(
-            email="dev@secguard.io",
+            email="dev@opensentinel.io",
             name="Developer User",
             password_hash=hash_password("dev123"),
             role="developer",
             org_id=org.id,
         )
         viewer = User(
-            email="viewer@secguard.io",
+            email="viewer@opensentinel.io",
             name="Viewer User",
             password_hash=hash_password("viewer123"),
             role="viewer",
@@ -175,10 +175,10 @@ def seed():
 
         session.commit()
         print("Seed data created successfully!")
-        print(f"  Organizations: 2 (SecGuard Demo + Other Corp)")
+        print(f"  Organizations: 2 (OpenSentinel Demo + Other Corp)")
         print(f"  Users: 5 (4 in demo org + 1 in other org)")
         print(f"  Projects: {len(projects)} in demo + 1 in other org")
-        print(f"  Use admin@secguard.io / admin123 to login")
+        print(f"  Use admin@opensentinel.io / admin123 to login")
         print(f"  Or sign up a new organization at /signup")
 
 

@@ -13,6 +13,14 @@ class Organization(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    
+
+    # Org-wide SonarQube creds. Per-project URL/token still wins if set.
+    sonarqube_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    sonarqube_token: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     users = relationship("User", back_populates="organization")
     projects = relationship("Project", back_populates="organization")
+
+    @property
+    def sonarqube_token_configured(self) -> bool:
+        return bool(self.sonarqube_token)

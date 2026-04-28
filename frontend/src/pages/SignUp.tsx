@@ -68,7 +68,7 @@ export default function SignUp() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <Shield className="mx-auto h-12 w-12 text-primary-600" />
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">SecGuard</h1>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">OpenSentinel</h1>
           <p className="text-sm text-gray-500">Create your organization</p>
         </div>
 

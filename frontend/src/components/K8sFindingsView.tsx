@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  ChevronDown, ChevronUp, AlertTriangle, Info, Search,
+  ChevronDown, ChevronRight, Search,
   Shield, Lock, FileText, Globe, Server, Box, Layers,
 } from 'lucide-react';
-import SeverityBadge from './common/SeverityBadge';
 
 interface Finding {
   id: string;
@@ -23,7 +23,26 @@ const KIND_ICONS: Record<string, typeof Box> = {
   ServiceAccount: Lock, Namespace: Globe, Node: Server,
 };
 
-export default function K8sFindingsView({ findings }: { findings: Finding[] }) {
+function sevDot(sev: string) {
+  return sev === 'critical' ? 'bg-red-500'
+    : sev === 'high' ? 'bg-amber-500'
+    : sev === 'medium' ? 'bg-yellow-400'
+    : sev === 'low' ? 'bg-blue-400' : 'bg-gray-300';
+}
+function sevText(sev: string) {
+  return sev === 'critical' ? 'text-red-700'
+    : sev === 'high' ? 'text-amber-700'
+    : sev === 'medium' ? 'text-yellow-700'
+    : sev === 'low' ? 'text-blue-700' : 'text-gray-500';
+}
+
+export default function K8sFindingsView({ findings, projectId, scanId }: {
+  findings: Finding[];
+  projectId?: string;
+  scanId?: string;
+}) {
+  const navigate = useNavigate();
+  const canNavigate = !!(projectId && scanId);
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const [nsFilter, setNsFilter] = useState('all');
@@ -106,195 +125,188 @@ export default function K8sFindingsView({ findings }: { findings: Finding[] }) {
     const s = f.severity as keyof typeof sevCounts;
     if (s in sevCounts) sevCounts[s]++;
   }
+  const uniqueNamespaces = new Set(filtered.map(f => rd(f).k8s_namespace).filter(Boolean)).size;
 
   return (
     <div className="space-y-4">
-      {/* Summary stats */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-center">
-          <p className="text-lg font-bold text-gray-800">{filtered.length}</p>
-          <p className="text-xs text-gray-500">Findings</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-center">
-          <p className="text-lg font-bold text-gray-800">{groups.length}</p>
-          <p className="text-xs text-gray-500">Resources</p>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-center">
-          <p className="text-lg font-bold text-red-600">{sevCounts.critical}</p>
-          <p className="text-xs text-red-500">Critical</p>
-        </div>
-        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-center">
-          <p className="text-lg font-bold text-orange-600">{sevCounts.high}</p>
-          <p className="text-xs text-orange-500">High</p>
-        </div>
+      {/* Stats strip */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <span className="text-gray-500">
+          <span className="font-semibold text-gray-900 tabular-nums">{filtered.length}</span> findings
+        </span>
+        <span className="text-gray-500">
+          <span className="font-semibold text-gray-900 tabular-nums">{groups.length}</span> resources
+        </span>
+        {uniqueNamespaces > 0 && (
+          <span className="text-gray-500">
+            <span className="font-semibold text-gray-900 tabular-nums">{uniqueNamespaces}</span> namespaces
+          </span>
+        )}
+        {sevCounts.critical > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-gray-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            <span className="font-semibold text-gray-900 tabular-nums">{sevCounts.critical}</span> critical
+          </span>
+        )}
+        {sevCounts.high > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-gray-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            <span className="font-semibold text-gray-900 tabular-nums">{sevCounts.high}</span> high
+          </span>
+        )}
       </div>
 
-      {/* Filters */}
+      {/* Toolbar — inline */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search resources, controls, descriptions…"
-            className="w-full rounded-lg border border-gray-200 py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            className="w-full rounded-md border border-gray-200 bg-white pl-8 pr-2 py-1.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-gray-400" />
         </div>
         <select value={sevFilter} onChange={e => setSevFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-600 focus:outline-none">
-          <option value="all">All Severities</option>
+          className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400">
+          <option value="all">All severities</option>
           {['critical', 'high', 'medium', 'low', 'info'].map(s => (
             <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)} ({sevCounts[s as keyof typeof sevCounts]})</option>
           ))}
         </select>
-        <select value={kindFilter} onChange={e => setKindFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-600 focus:outline-none">
-          <option value="all">All Kinds</option>
-          {allKinds.map(k => <option key={k} value={k}>{k}</option>)}
-        </select>
-        {allNamespaces.length > 0 && (
+        {allKinds.length > 1 && (
+          <select value={kindFilter} onChange={e => setKindFilter(e.target.value)}
+            className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400">
+            <option value="all">All kinds</option>
+            {allKinds.map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+        )}
+        {allNamespaces.length > 1 && (
           <select value={nsFilter} onChange={e => setNsFilter(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-600 focus:outline-none">
-            <option value="all">All Namespaces</option>
+            className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400">
+            <option value="all">All namespaces</option>
             {allNamespaces.map(ns => <option key={ns} value={ns}>{ns}</option>)}
           </select>
         )}
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-600 focus:outline-none">
-          <option value="all">All Categories</option>
-          {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        {allCategories.length > 1 && (
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
+            className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400">
+            <option value="all">All categories</option>
+            {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Resource groups */}
-      <div className="space-y-3">
-        {groups.map(g => {
-          const key = `${g.kind}/${g.name}/${g.namespace}`;
-          const isOpen = expanded.has(key);
-          const KindIcon = KIND_ICONS[g.kind] ?? Box;
-          return (
-            <div key={key} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-              {/* Resource header */}
-              <button onClick={() => toggle(key)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                  <KindIcon className="h-4 w-4 text-slate-600" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">{g.kind}</span>
-                    <span className="font-semibold text-gray-800 truncate">{g.name}</span>
-                    {g.namespace && (
-                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">ns: {g.namespace}</span>
-                    )}
+      {groups.length === 0 ? (
+        <p className="rounded-md border border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
+          No findings match the selected filters.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {groups.map(g => {
+            const key = `${g.kind}/${g.name}/${g.namespace}`;
+            const isOpen = expanded.has(key);
+            const KindIcon = KIND_ICONS[g.kind] ?? Box;
+            return (
+              <div key={key} className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                {/* Resource header */}
+                <button onClick={() => toggle(key)}
+                  className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50/60">
+                  <KindIcon className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={1.75} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-400">{g.kind}</span>
+                      <span className="text-sm font-medium text-gray-900 truncate">{g.name}</span>
+                      {g.namespace && (
+                        <span className="font-mono text-[11px] text-gray-500">ns: {g.namespace}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {g.critical > 0 && <span className="flex items-center gap-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">{g.critical} C</span>}
-                  {g.high > 0 && <span className="flex items-center gap-0.5 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">{g.high} H</span>}
-                  {g.medium > 0 && <span className="flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700">{g.medium} M</span>}
-                  {g.low > 0 && <span className="flex items-center gap-0.5 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">{g.low} L</span>}
-                  <span className="ml-1 text-xs text-gray-400">{g.findings.length}</span>
-                  {isOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                </div>
-              </button>
+                  <div className="flex items-center gap-2.5 shrink-0 text-[11px]">
+                    {g.critical > 0 && (
+                      <span className="inline-flex items-center gap-1 text-gray-600">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                        <span className="tabular-nums font-semibold">{g.critical}</span>
+                      </span>
+                    )}
+                    {g.high > 0 && (
+                      <span className="inline-flex items-center gap-1 text-gray-600">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        <span className="tabular-nums font-semibold">{g.high}</span>
+                      </span>
+                    )}
+                    {g.medium > 0 && (
+                      <span className="inline-flex items-center gap-1 text-gray-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                        <span className="tabular-nums">{g.medium}</span>
+                      </span>
+                    )}
+                    {g.low > 0 && (
+                      <span className="inline-flex items-center gap-1 text-gray-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                        <span className="tabular-nums">{g.low}</span>
+                      </span>
+                    )}
+                    <span className="text-gray-400 tabular-nums">
+                      {g.findings.length} finding{g.findings.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {isOpen
+                    ? <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+                    : <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-gray-600" />}
+                </button>
 
-              {/* Expanded findings */}
-              {isOpen && (
-                <div className="border-t divide-y divide-gray-100">
-                  {g.findings.map(f => {
-                    const r = rd(f);
-                    const controlId = r.controlID ?? r.ID ?? '';
-                    const category = r.category ?? r.Type ?? '';
-                    const refUrl = r.PrimaryURL;
-                    const message = r.Message ?? '';
-                    const resolution = f.remediation ?? r.Resolution ?? '';
-                    const causeLines = r.CauseMetadata?.Code?.Lines as Array<{ Number: number; Content: string; IsCause: boolean }> | undefined;
+                {/* Expanded findings — compact rows; click navigates if route is known */}
+                {isOpen && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-100">
+                    {g.findings.map(f => {
+                      const r = rd(f);
+                      const controlId = r.controlID ?? r.ID ?? '';
+                      const category = r.category ?? r.Type ?? '';
+                      const isClosed = ['resolved', 'accepted', 'false_positive'].includes(f.status);
 
-                    return (
-                      <div key={f.id} className="px-4 py-3 space-y-2">
-                        {/* Finding header */}
-                        <div className="flex items-start gap-2 flex-wrap">
-                          <SeverityBadge severity={f.severity} />
-                          {controlId && <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600">{controlId}</span>}
-                          {category && <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">{category}</span>}
-                          {refUrl && (
-                            <a href={refUrl} target="_blank" rel="noopener noreferrer"
-                              className="ml-auto rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-100 hover:underline"
-                              onClick={e => e.stopPropagation()}>
-                              Reference ↗
-                            </a>
+                      const rowContent = (
+                        <>
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${sevDot(f.severity)}`} />
+                          <span className={`w-16 shrink-0 text-[10px] uppercase tracking-wider font-medium ${sevText(f.severity)}`}>{f.severity}</span>
+                          {controlId && (
+                            <span className="shrink-0 font-mono text-[11px] text-gray-700">{controlId}</span>
                           )}
+                          <span className="min-w-0 flex-1 truncate text-[13px] text-gray-800">{f.title}</span>
+                          {category && (
+                            <span className="hidden md:inline shrink-0 text-[11px] text-gray-500 truncate max-w-[180px]">{category}</span>
+                          )}
+                          {canNavigate && (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-gray-600" />
+                          )}
+                        </>
+                      );
+
+                      const baseClass = `group flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                        canNavigate ? 'hover:bg-gray-50/60' : ''
+                      } ${isClosed ? 'opacity-60' : ''}`;
+
+                      if (canNavigate) {
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => navigate(`/projects/${projectId}/k8s/${scanId}/findings/${f.id}`)}
+                            className={baseClass}
+                          >
+                            {rowContent}
+                          </button>
+                        );
+                      }
+                      return (
+                        <div key={f.id} className={baseClass}>
+                          {rowContent}
                         </div>
-                        <p className="text-sm font-medium text-gray-800">{f.title}</p>
-
-                        {/* Description / message */}
-                        {(f.description || message) && (
-                          <p className="text-xs text-gray-500 leading-relaxed">
-                            {f.description || message}
-                          </p>
-                        )}
-                        {message && f.description && message !== f.description && (
-                          <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
-                            <p className="text-xs text-amber-700">{message}</p>
-                          </div>
-                        )}
-
-                        {/* Cause code snippet (Trivy) */}
-                        {causeLines && causeLines.length > 0 && (
-                          <div className="rounded-lg border border-gray-200 bg-gray-900 overflow-hidden">
-                            <div className="px-3 py-1.5 bg-gray-800 text-[10px] font-medium text-gray-400 uppercase tracking-wider">
-                              Affected Configuration
-                            </div>
-                            <pre className="px-3 py-2 text-xs leading-5 overflow-x-auto">
-                              {causeLines.filter(l => l.Content !== undefined).map((l, i) => (
-                                <div key={i} className={`flex ${l.IsCause ? 'bg-red-900/30' : ''}`}>
-                                  <span className="w-8 shrink-0 text-right text-gray-500 select-none pr-3">{l.Number}</span>
-                                  <span className={l.IsCause ? 'text-red-300' : 'text-gray-400'}>{l.Content}</span>
-                                </div>
-                              ))}
-                            </pre>
-                          </div>
-                        )}
-
-                        {/* Failed/fix paths (Kubescape) */}
-                        {!causeLines && ((r.failedPaths as string[])?.length > 0 || (r.fixPaths as Array<{path: string; value: string}>)?.length > 0) && (
-                          <div className="rounded-lg border border-gray-200 bg-gray-900 overflow-hidden">
-                            <div className="px-3 py-1.5 bg-gray-800 text-[10px] font-medium text-gray-400 uppercase tracking-wider">Affected Paths</div>
-                            <div className="px-3 py-2 space-y-1.5">
-                              {(r.failedPaths as string[])?.map((p: string, i: number) => (
-                                <div key={i} className="font-mono text-xs text-red-300">{p}</div>
-                              ))}
-                              {(r.fixPaths as Array<{path: string; value: string}>)?.map((fix: {path: string; value: string}, i: number) => (
-                                <div key={i} className="font-mono text-xs">
-                                  <span className="text-green-300">{fix.path}</span>
-                                  {fix.value && <span className="text-gray-500"> = </span>}
-                                  {fix.value && <span className="text-green-200">{fix.value}</span>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Remediation */}
-                        {resolution && (
-                          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-                            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" />
-                            <div>
-                              <span className="text-xs font-semibold text-green-700">Remediation</span>
-                              <p className="text-xs text-green-600 mt-0.5">{resolution}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {groups.length === 0 && (
-        <p className="py-8 text-center text-sm text-gray-400">No findings match the selected filters.</p>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

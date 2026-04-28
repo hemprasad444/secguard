@@ -2,7 +2,7 @@ from celery import Celery
 from app.config import settings
 
 celery = Celery(
-    "secguard",
+    "opensentinel",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
     include=["app.tasks.scan_tasks"],

@@ -25,9 +25,21 @@ class Project(Base):
     )
     kubeconfig_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
+    # SonarQube integration (optional). When set, "Sync SonarQube" pulls issues into our findings table.
+    sonarqube_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    sonarqube_project_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    sonarqube_token: Mapped[str | None] = mapped_column(String, nullable=True)
+    sonarqube_last_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True
     )
+
+    @property
+    def sonarqube_token_configured(self) -> bool:
+        return bool(self.sonarqube_token)
 
     organization = relationship("Organization", back_populates="projects")
     creator = relationship("User", foreign_keys=[created_by], lazy="selectin")
