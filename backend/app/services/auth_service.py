@@ -35,7 +35,11 @@ async def login_user(db: AsyncSession, data: UserLogin) -> TokenResponse:
 
     access_token = create_access_token(str(user.id), user.role)
     refresh_token = create_refresh_token(str(user.id))
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        must_change_password=bool(user.must_change_password),
+    )
 
 
 async def refresh_access_token(db: AsyncSession, refresh_token: str) -> TokenResponse:
@@ -51,4 +55,8 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> TokenRes
 
     access_token = create_access_token(str(user.id), user.role)
     new_refresh = create_refresh_token(str(user.id))
-    return TokenResponse(access_token=access_token, refresh_token=new_refresh)
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=new_refresh,
+        must_change_password=bool(user.must_change_password),
+    )

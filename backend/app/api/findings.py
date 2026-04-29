@@ -36,6 +36,7 @@ async def list_findings(
     tool_name: str | None = Query(None),
     status: str | None = Query(None),
     project_id: UUID | None = Query(None),
+    assignee: str | None = Query(None, description="'me', 'none', or a user UUID"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -53,6 +54,17 @@ async def list_findings(
         query = query.where(Finding.status == status)
     if project_id is not None:
         query = query.where(Finding.project_id == project_id)
+
+    if assignee is not None:
+        if assignee == "me":
+            query = query.where(Finding.assigned_to == current_user.id)
+        elif assignee == "none":
+            query = query.where(Finding.assigned_to.is_(None))
+        else:
+            try:
+                query = query.where(Finding.assigned_to == UUID(assignee))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid assignee value")
 
     # Tenant isolation: filter findings by org_id through the project relationship
     if current_user.org_id:

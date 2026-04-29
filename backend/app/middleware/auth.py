@@ -52,10 +52,16 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
-async def get_current_user(
+async def get_current_user_unlocked(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    """Resolve the current user from the JWT WITHOUT enforcing password-change.
+
+    Used by /auth/me and /auth/change-password so a user with a temporary password
+    can call those endpoints to fix their state. Everything else should depend on
+    `get_current_user`, which adds the must_change_password gate on top.
+    """
     payload = decode_token(credentials.credentials)
     if payload.get("type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
@@ -67,6 +73,21 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+    return user
+
+
+async def get_current_user(
+    user: User = Depends(get_current_user_unlocked),
+) -> User:
+    """Default dependency for protected endpoints. Blocks with 403 when the user
+    still has a temporary password — they have to call /auth/change-password first.
+    """
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password change required",
+            headers={"X-Password-Change-Required": "true"},
+        )
     return user
 
 

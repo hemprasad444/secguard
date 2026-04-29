@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.user import UserCreate, UserLogin, TokenResponse, UserResponse
+from app.schemas.user import UserCreate, UserLogin, TokenResponse, UserResponse, ChangePasswordRequest
 from app.services.auth_service import register_user, login_user, refresh_access_token
-from app.middleware.auth import get_current_user, require_role
+from app.middleware.auth import get_current_user, get_current_user_unlocked, require_role, hash_password, verify_password
 from app.database import get_db
 from app.models.user import User
 
@@ -42,7 +42,7 @@ async def refresh(body: dict, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me")
-async def me(current_user: User = Depends(get_current_user)):
+async def me(current_user: User = Depends(get_current_user_unlocked)):
     """Return the currently authenticated user with org info."""
     user_data = {
         "id": str(current_user.id),
@@ -50,8 +50,26 @@ async def me(current_user: User = Depends(get_current_user)):
         "name": current_user.name,
         "role": current_user.role,
         "is_active": current_user.is_active,
+        "must_change_password": bool(current_user.must_change_password),
         "created_at": current_user.created_at.isoformat(),
         "org_id": str(current_user.org_id) if current_user.org_id else None,
         "org_name": current_user.organization.name if current_user.organization else None,
     }
     return user_data
+
+
+@router.post("/change-password")
+async def change_password(
+    body: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_unlocked),
+):
+    """User-initiated password change. Also clears must_change_password."""
+    if not verify_password(body.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must differ from the current one")
+    current_user.password_hash = hash_password(body.new_password)
+    current_user.must_change_password = False
+    await db.commit()
+    return {"status": "ok"}

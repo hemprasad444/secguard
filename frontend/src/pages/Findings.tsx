@@ -53,6 +53,7 @@ export default function Findings() {
   const [filterTool, setFilterTool] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterProject, setFilterProject] = useState('');
+  const [myQueue, setMyQueue] = useState(false);
 
   /* Selection & bulk */
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -80,6 +81,7 @@ export default function Findings() {
       if (filterTool) params.tool_name = filterTool;
       if (filterStatus) params.status = filterStatus;
       if (filterProject) params.project_id = filterProject;
+      if (myQueue) params.assignee = 'me';
 
       const res = await getFindings(params);
       const items = res.items ?? res.results ?? res;
@@ -90,7 +92,7 @@ export default function Findings() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, filterSeverity, filterTool, filterStatus, filterProject]);
+  }, [page, pageSize, filterSeverity, filterTool, filterStatus, filterProject, myQueue]);
 
   useEffect(() => {
     fetchFindings();
@@ -195,6 +197,11 @@ export default function Findings() {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
+        <label className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-gray-700 cursor-pointer select-none">
+          <input type="checkbox" checked={myQueue} onChange={e => { setMyQueue(e.target.checked); setPage(1); }}
+            className="h-3 w-3 rounded border-gray-300" />
+          My queue
+        </label>
       </div>
 
       {/* ---- Bulk actions ---- */}

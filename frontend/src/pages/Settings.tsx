@@ -29,6 +29,8 @@ export default function Settings() {
 
   const [tools, setTools] = useState<ToolConfig[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [showNewUser, setShowNewUser] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
   const [loadingTools, setLoadingTools] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [error, setError] = useState('');
@@ -173,11 +175,15 @@ export default function Settings() {
 
       {/* ---- User Management ---- */}
       <div className="rounded-lg bg-white shadow">
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-gray-400" />
             <h2 className="text-lg font-semibold text-gray-800">User Management</h2>
           </div>
+          <button onClick={() => setShowNewUser(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-black">
+            + New user
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -252,6 +258,167 @@ export default function Settings() {
                   ))}
             </tbody>
           </table>
+        </div>
+      </div>
+      {showNewUser && (
+        <NewUserModal
+          onClose={() => setShowNewUser(false)}
+          onCreated={(email, password) => {
+            setShowNewUser(false);
+            setCreatedCreds({ email, password });
+            // refresh user list
+            (async () => {
+              try {
+                const { data } = await api.get('/users');
+                setUsers(data.items ?? data.results ?? data);
+              } catch { /* noop */ }
+            })();
+          }}
+        />
+      )}
+      {createdCreds && (
+        <CredsRevealModal
+          email={createdCreds.email}
+          password={createdCreds.password}
+          onClose={() => setCreatedCreds(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────── Modals ───────────────────────────── */
+
+function NewUserModal({ onClose, onCreated }: {
+  onClose: () => void;
+  onCreated: (email: string, password: string) => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('viewer');
+  const [autoGen, setAutoGen] = useState(true);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(''); setBusy(true);
+    try {
+      const body: any = { email, name, role };
+      if (!autoGen && password.trim()) body.password = password.trim();
+      const { data } = await api.post('/users/', body);
+      onCreated(data.user.email, data.temporary_password);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? 'Failed to create user.');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-md bg-white shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="border-b border-gray-100 px-5 py-3">
+          <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-700">New user</p>
+          <p className="mt-0.5 text-[12px] text-gray-500">
+            We'll create the account and either auto-generate a temporary password or use the one you set.
+            The user must change it on first login.
+          </p>
+        </div>
+        <form onSubmit={submit} className="px-5 py-4 space-y-3">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400">Email</span>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400">Name</span>
+            <input type="text" required value={name} onChange={e => setName(e.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400">Role</span>
+            <select value={role} onChange={e => setRole(e.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400">
+              <option value="viewer">Viewer — read-only</option>
+              <option value="developer">Developer — can close findings</option>
+              <option value="security_engineer">Security Engineer — can configure projects + scans</option>
+              <option value="admin">Admin — full access incl. user management</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-[12px] text-gray-700">
+            <input type="checkbox" checked={autoGen} onChange={e => setAutoGen(e.target.checked)}
+              className="h-3 w-3 rounded border-gray-300" />
+            Auto-generate temporary password
+          </label>
+          {!autoGen && (
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-gray-400">Temporary password</span>
+              <input type="text" required minLength={8} value={password} onChange={e => setPassword(e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:border-gray-400" />
+            </label>
+          )}
+          {error && <p className="text-[12px] text-red-700">{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} disabled={busy}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={busy}
+              className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-black disabled:opacity-50">
+              {busy ? 'Creating…' : 'Create user'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CredsRevealModal({ email, password, onClose }: {
+  email: string;
+  password: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* noop */ }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-md bg-white shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="border-b border-gray-100 px-5 py-3">
+          <p className="text-[11px] uppercase tracking-wider font-semibold text-emerald-700">User created</p>
+          <p className="mt-0.5 text-[12px] text-gray-500">
+            Hand this off securely. We don't store the password in plaintext — close this dialog and it's gone.
+          </p>
+        </div>
+        <div className="px-5 py-4 space-y-3 text-[13px]">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 w-20 text-[11px] uppercase tracking-wider">Email</span>
+            <span className="font-mono text-gray-800 break-all">{email}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 w-20 text-[11px] uppercase tracking-wider">Password</span>
+            <span className="font-mono text-gray-900 bg-gray-100 rounded px-2 py-1 break-all flex-1">{password}</span>
+            <button onClick={copy}
+              className="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            On first login the user will be required to change this password before they can do anything else.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button onClick={onClose}
+            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-black">
+            Done
+          </button>
         </div>
       </div>
     </div>

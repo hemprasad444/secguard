@@ -30,3 +30,29 @@ export const logout = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
 };
+
+export const changePassword = async (current_password: string, new_password: string) => {
+  const { data } = await api.post('/auth/change-password', { current_password, new_password });
+  return data;
+};
+
+export const adminCreateUser = async (body: {
+  email: string;
+  name: string;
+  role: string;
+  password?: string;
+}) => {
+  const { data } = await api.post('/users/', body);
+  return data as {
+    user: { id: string; email: string; name: string; role: string };
+    temporary_password: string;
+  };
+};
+
+export const adminResetPassword = async (userId: string) => {
+  const { data } = await api.post(`/users/${userId}/reset-password`);
+  return data as {
+    user: { id: string; email: string };
+    temporary_password: string;
+  };
+};

@@ -16,12 +16,16 @@ import Scans from './pages/Scans';
 import Findings from './pages/Findings';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import ChangePassword from './pages/ChangePassword';
 import { useAuthStore } from './stores/authStore';
 import { getMe } from './api/auth';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user) as any;
   if (!isAuthenticated) return <Navigate to="/login" />;
+  // Force first-login password change before any other in-app navigation
+  if (user?.must_change_password) return <Navigate to="/change-password" />;
   return <>{children}</>;
 }
 
@@ -38,6 +42,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboards />} />
         <Route path="analytics" element={<Navigate to="/" replace />} />
