@@ -20,10 +20,45 @@ OpenSentinel is an open-source, self-hosted security scanning platform that prov
 
 ## Screenshots
 
-<!-- Add your screenshots here -->
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
-<!-- ![K8s Scan Results](docs/screenshots/k8s-results.png) -->
-<!-- ![Image Comparison](docs/screenshots/image-compare.png) -->
+### Sign in / sign up
+The brand panel uses an octagonal aperture mark + radar-sweep ambient
+animation; the form panel keeps it short.
+
+![Login](docs/screenshots/login.png)
+![Sign up](docs/screenshots/signup.png)
+
+### Scans
+Six scan types (Dependency, Secrets, SBOM, SAST, DAST, K8s) live on a
+single page; each tile shows recent runs inline.
+
+![Scans](docs/screenshots/scans.png)
+
+### Findings
+Severity / tool / status / project filters compose; click a row to
+expand the full finding.
+
+![Findings](docs/screenshots/findings.png)
+
+### Scan detail
+Per-scan breakdown with package counts, max CVSS, suggested fix
+versions, and a one-click "Verify fixed image" trigger.
+
+![Scan detail](docs/screenshots/scan-detail.png)
+
+### Users (admin)
+Admins manage their org's users — add, change role, deactivate, reset
+password. A one-time temporary password is shown to share with the
+new user.
+
+![Users](docs/screenshots/users.png)
+![Add user — credentials shown once](docs/screenshots/users-after-create.png)
+
+### Projects, My Tasks, Reports, Settings
+
+| | |
+|---|---|
+| ![Projects](docs/screenshots/projects.png) | ![My Tasks](docs/screenshots/my-tasks.png) |
+| ![Reports](docs/screenshots/reports.png) | ![Settings](docs/screenshots/settings.png) |
 
 ## Architecture
 

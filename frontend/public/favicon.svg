@@ -1,0 +1,16 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- OpenSentinel favicon: octagonal aperture in teal/cyan accent on
+       the deep-navy surface that matches the in-app brand panels. -->
+  <defs>
+    <linearGradient id="osg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#0c1a3a"/>
+  <g fill="none" stroke="url(#osg)" stroke-width="3" stroke-linejoin="round">
+    <polygon points="32,10 49,17 56,32 49,47 32,54 15,47 8,32 15,17" />
+    <polygon points="32,20 41,24 46,32 41,40 32,44 23,40 18,32 23,24" opacity="0.55" />
+  </g>
+  <circle cx="32" cy="32" r="3.5" fill="url(#osg)" />
+</svg>

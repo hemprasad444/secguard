@@ -28,6 +28,26 @@ TOOL_SCAN_TYPE_MAP: dict[str, str] = {
 }
 
 
+async def _fetch_scan_in_org(
+    db: AsyncSession, scan_id: UUID, user: User
+) -> Scan:
+    """Fetch a scan by id, scoped to the caller's organization (via the
+    scan's project). Returns 404 for cross-org access — avoids leaking
+    existence of scans in other tenants.
+    """
+    query = select(Scan).where(Scan.id == scan_id)
+    if user.org_id is not None:
+        org_project_ids = (
+            select(Project.id).where(Project.org_id == user.org_id).scalar_subquery()
+        )
+        query = query.where(Scan.project_id.in_(org_project_ids))
+    result = await db.execute(query)
+    scan = result.scalar_one_or_none()
+    if not scan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    return scan
+
+
 @router.post("/trigger", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
 async def trigger_scan(
     body: ScanTrigger,
@@ -45,13 +65,21 @@ async def trigger_scan(
     if body.tool_name == "trivy" and body.config and body.config.get("scan_subtype") == "k8s":
         scan_type = "k8s"
 
+    # Strip whitespace from the image target before storing so that
+    # downstream tools (Trivy in particular) get a clean OCI reference.
+    # Without this, a pasted " ghcr.io/...:tag\n" would land in the DB
+    # and Trivy would reject every rescan with "could not parse reference".
+    cfg = dict(body.config or {})
+    if isinstance(cfg.get("target"), str):
+        cfg["target"] = cfg["target"].strip()
+
     scan = Scan(
         project_id=body.project_id,
         tool_name=body.tool_name,
         scan_type=scan_type,
         status="pending",
         triggered_by=current_user.id,
-        config_json=body.config or {},
+        config_json=cfg,
     )
     db.add(scan)
     await db.flush()
@@ -209,10 +237,7 @@ async def delete_scan(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Delete a scan and all its findings. Requires security_engineer role."""
-    result = await db.execute(select(Scan).where(Scan.id == scan_id))
-    scan = result.scalar_one_or_none()
-    if not scan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    scan = await _fetch_scan_in_org(db, scan_id, current_user)
 
     # Delete associated findings first (FK constraint)
     findings_result = await db.execute(select(Finding).where(Finding.scan_id == scan_id))
@@ -230,10 +255,7 @@ async def get_scan(
     current_user: User = Depends(get_current_user),
 ):
     """Get a single scan by ID."""
-    result = await db.execute(select(Scan).where(Scan.id == scan_id))
-    scan = result.scalar_one_or_none()
-    if not scan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    scan = await _fetch_scan_in_org(db, scan_id, current_user)
     return scan
 
 
@@ -244,10 +266,7 @@ async def get_scan_sbom(
     current_user: User = Depends(get_current_user),
 ):
     """Get SBOM output for an SBOM scan."""
-    result = await db.execute(select(Scan).where(Scan.id == scan_id))
-    scan = result.scalar_one_or_none()
-    if not scan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    scan = await _fetch_scan_in_org(db, scan_id, current_user)
     return scan.output_data or {}
 
 
@@ -260,11 +279,8 @@ async def get_scan_findings(
     current_user: User = Depends(get_current_user),
 ):
     """Get all findings for a specific scan, paginated."""
-    # Verify the scan exists
-    scan_result = await db.execute(select(Scan).where(Scan.id == scan_id))
-    scan = scan_result.scalar_one_or_none()
-    if not scan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    # Verify the scan exists AND is in the caller's org
+    await _fetch_scan_in_org(db, scan_id, current_user)
 
     offset = (page - 1) * page_size
     result = await db.execute(

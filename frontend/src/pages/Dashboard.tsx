@@ -1469,6 +1469,11 @@ export default function Dashboard() {
 
   const [loading, setLoading]             = useState(true);
   const [cmpLoading, setCmpLoading]       = useState(false);
+  // Error messages surfaced inline instead of being swallowed by .catch(()=>{}).
+  // Without these the loading spinner used to spin forever / the comparison
+  // panel would stay blank with no indication that the API had failed.
+  const [primaryError, setPrimaryError]   = useState<string | null>(null);
+  const [cmpError, setCmpError]           = useState<string | null>(null);
   const [availableScanTypes, setAvailableScanTypes] = useState<string[]>([]);
   const [scanTypeFilter, setScanTypeFilter] = useState('');   // set after first load
 
@@ -1494,6 +1499,7 @@ export default function Dashboard() {
   // Load primary data for selected scan type
   const fetchPrimary = useCallback(async (pid?: string, scanType?: string, k8sToolFilter?: string) => {
     setLoading(true);
+    setPrimaryError(null);
     try {
       const isSecrets = scanType === 'Secrets';
       const isSbom = scanType === 'SBOM';
@@ -1519,7 +1525,11 @@ export default function Dashboard() {
       setK8sCategories(k8sCats.data ?? []);
       setK8sResources(k8sRes.data ?? []);
       setK8sNamespaces(k8sNs.data ?? []);
-    } catch { /* noop */ }
+    } catch (err: any) {
+      setPrimaryError(
+        err?.response?.data?.detail ?? err?.message ?? 'Failed to load dashboard data'
+      );
+    }
     setLoading(false);
   }, []);
 
@@ -1532,6 +1542,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!compareMode || (!pidA && !pidB)) return;
     setCmpLoading(true);
+    setCmpError(null);
     Promise.all([
       pidA ? Promise.all([getSummary(pidA), getToolBreakdown(pidA), getScanTypeSeverity(pidA), getSbomLicenseBreakdown(pidA)]) : Promise.resolve([null, { data: [] }, { data: [] }, null]),
       pidB ? Promise.all([getSummary(pidB), getToolBreakdown(pidB), getScanTypeSeverity(pidB), getSbomLicenseBreakdown(pidB)]) : Promise.resolve([null, { data: [] }, { data: [] }, null]),
@@ -1544,14 +1555,46 @@ export default function Dashboard() {
       setScanTypeSevB((stb as any)?.data ?? []);
       setSbomLicenseA(sla as SbomLicenseData | null);
       setSbomLicenseB(slb as SbomLicenseData | null);
-    }).catch(() => {}).finally(() => setCmpLoading(false));
+    }).catch((err: any) => {
+      // Previously this was `.catch(() => {})` and the comparison panel
+      // would stay blank forever with no indication of failure.
+      setCmpError(
+        err?.response?.data?.detail ?? err?.message ?? 'Failed to load comparison data'
+      );
+    }).finally(() => setCmpLoading(false));
   }, [compareMode, pidA, pidB]);
 
   const nameA = projects.find(p => p.id === pidA)?.name ?? 'Project A';
   const nameB = projects.find(p => p.id === pidB)?.name ?? 'Project B';
 
+  // Surface whichever error is relevant to the user's current view.
+  const visibleError = compareMode ? cmpError : primaryError;
+
   return (
     <div className="space-y-5">
+
+      {/* Inline error banner — replaces the silent failure mode where a
+          dropped network request used to leave the spinner spinning. */}
+      {visibleError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 flex items-center justify-between">
+          <span><span className="font-semibold">Couldn't load dashboard data:</span> {visibleError}</span>
+          <button
+            onClick={() => {
+              if (compareMode) {
+                setCmpError(null);
+                setPidA(v => v); setPidB(v => v);
+              } else {
+                setPrimaryError(null);
+                fetchPrimary(selectedId || undefined, scanTypeFilter, scanTypeFilter === 'K8s' ? k8sTool : undefined);
+              }
+            }}
+            className="ml-3 rounded border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
 
       {/* ── Header bar ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-4">

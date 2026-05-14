@@ -41,5 +41,4 @@ redis_data/
 # Logs
 *.log
 
-# Claude Code
-.claude/
+docker-compose.override.yml

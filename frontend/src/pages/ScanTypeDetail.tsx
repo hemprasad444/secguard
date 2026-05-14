@@ -540,6 +540,11 @@ function RescanModal({ failed, projectId, onClose, onDone }: {
   const [regPass, setRegPass] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  // Track failures so we don't silently close the modal pretending success.
+  // Previously each rescan call was wrapped in `catch { /* noop */ }` and
+  // the user got no feedback when, say, every image's auth had expired —
+  // they'd see the progress bar fill, the modal close, and assume it worked.
+  const [errors, setErrors] = useState<{ target: string; message: string }[]>([]);
 
   const updateTarget = (id: string, val: string) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, target: val } : e));
@@ -548,20 +553,31 @@ function RescanModal({ failed, projectId, onClose, onDone }: {
     e.preventDefault();
     setSubmitting(true);
     setProgress({ done: 0, total: entries.length });
+    const failures: { target: string; message: string }[] = [];
     for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
       try {
-        const entry = entries[i];
         const cfg: Record<string, any> = { ...entry.config };
         delete cfg.unique_packages_count;
         if (entry.target) cfg.target = entry.target;
         if (regUser) cfg.registry_username = regUser;
         if (regPass) cfg.registry_password = regPass;
         await triggerScan({ project_id: projectId, tool_name: failed[i].tool_name, config: cfg });
-      } catch { /* noop */ }
+      } catch (err: any) {
+        const message =
+          err?.response?.data?.detail ??
+          err?.message ??
+          'Unknown error';
+        failures.push({ target: entry.target || `(scan ${i + 1})`, message: String(message) });
+      }
       setProgress({ done: i + 1, total: entries.length });
     }
     setSubmitting(false);
-    onDone();
+    setErrors(failures);
+    if (failures.length === 0) {
+      onDone();
+    }
+    // If some/all failed, leave the modal open so the user sees what broke.
   };
 
   const inputCls = 'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
@@ -633,17 +649,37 @@ function RescanModal({ failed, projectId, onClose, onDone }: {
             </div>
           )}
 
+          {/* Error summary — shown only after a run that had failures so
+              the user can see what didn't go through and retry. */}
+          {!submitting && errors.length > 0 && (
+            <div className="border-t border-red-200 bg-red-50 px-6 py-3">
+              <p className="text-xs font-semibold text-red-700">
+                {errors.length} of {entries.length} rescan{entries.length === 1 ? '' : 's'} failed
+              </p>
+              <ul className="mt-1.5 max-h-24 space-y-0.5 overflow-y-auto text-xs text-red-700">
+                {errors.map((e, i) => (
+                  <li key={i} className="font-mono truncate">
+                    <span className="font-semibold">{e.target}</span>
+                    <span className="text-red-600/80"> — {e.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="flex justify-end gap-3 border-t px-6 py-4">
             <button type="button" onClick={onClose} disabled={submitting}
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40">
-              Cancel
+              {errors.length > 0 ? 'Close' : 'Cancel'}
             </button>
             <button type="submit" disabled={submitting}
               className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60">
               {submitting
                 ? <><RefreshCw className="h-4 w-4 animate-spin" /> Rescanning {progress?.done}/{progress?.total}…</>
-                : <><Play className="h-4 w-4" /> Rescan {entries.length} image{entries.length !== 1 ? 's' : ''}</>
+                : errors.length > 0
+                  ? <><RefreshCw className="h-4 w-4" /> Retry {errors.length} failed</>
+                  : <><Play className="h-4 w-4" /> Rescan {entries.length} image{entries.length !== 1 ? 's' : ''}</>
               }
             </button>
           </div>

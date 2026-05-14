@@ -54,8 +54,21 @@ class TrivyIntegration(BaseIntegration):
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"Failed to parse Trivy JSON output: {exc}")
 
+    @staticmethod
+    def _sanitize_target(target: str) -> str:
+        """Trim whitespace from the image reference / path.
+
+        Real-world bug: users paste `ghcr.io/org/img:tag\\n` or a leading-
+        space-prefixed reference into the scan form. Trivy then reports
+        ``could not parse reference: ' ghcr.io/...'`` because its OCI
+        reference parser rejects whitespace. Strip on the way in so the
+        rest of the pipeline doesn't have to care.
+        """
+        return (target or "").strip()
+
     def run_scan(self, target: str, config: dict) -> list[NormalizedFinding]:
         """Entry point — routes to the correct sub-scanner."""
+        target = self._sanitize_target(target)
         subtype = config.get("scan_subtype", "dependency")
         if subtype == "secrets":
             return self._run_secrets_scan(target, config)
@@ -65,6 +78,7 @@ class TrivyIntegration(BaseIntegration):
 
     def run_sbom_scan(self, target: str, config: dict) -> dict | None:
         """Run a Trivy SBOM scan and return raw CycloneDX JSON."""
+        target = self._sanitize_target(target)
         scan_type = config.get("scan_type", "image")
         if scan_type not in ("image", "repo", "fs"):
             scan_type = "image"

@@ -17,6 +17,24 @@ from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, S
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
+async def _get_project_for_user(
+    db: AsyncSession, project_id: UUID, current_user: User
+) -> Project:
+    """Fetch a project by id, scoped to the caller's organization.
+
+    Returns 404 (not 403) for cross-org access to avoid confirming the
+    existence of projects in other organizations.
+    """
+    query = select(Project).where(Project.id == project_id)
+    if current_user.org_id is not None:
+        query = query.where(Project.org_id == current_user.org_id)
+    result = await db.execute(query)
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    return project
+
+
 @router.get("/", response_model=list[ProjectResponse])
 async def list_projects(
     page: int = Query(1, ge=1),
@@ -56,11 +74,7 @@ async def get_project(
     current_user: User = Depends(get_current_user),
 ):
     """Get a single project by ID."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    return project
+    return await _get_project_for_user(db, project_id, current_user)
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -71,10 +85,7 @@ async def update_project(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Update a project. Requires security_engineer role."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
 
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -92,10 +103,7 @@ async def delete_project(
     current_user: User = Depends(require_role("admin")),
 ):
     """Delete a project and all associated data. Requires admin role."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
 
     # Delete related records before the project (no DB-level cascade)
     await db.execute(delete(Finding).where(Finding.project_id == project_id))
@@ -115,10 +123,7 @@ async def upload_kubeconfig(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Upload a kubeconfig file for K8s scanning."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
 
     content = await kubeconfig.read()
     try:
@@ -145,10 +150,7 @@ async def delete_kubeconfig(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Remove stored kubeconfig for a project."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
     project.kubeconfig_data = None
     await db.commit()
 
@@ -160,10 +162,7 @@ async def kubeconfig_status(
     current_user: User = Depends(get_current_user),
 ):
     """Check whether a kubeconfig is configured for a project."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
     configured = project.kubeconfig_data is not None
     clusters = len(project.kubeconfig_data.get("clusters", [])) if configured else 0
     return {"configured": configured, "clusters": clusters}
@@ -179,10 +178,7 @@ async def configure_sonarqube(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Persist SonarQube URL/project key/token on a project. Token is optional on update."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
 
     project.sonarqube_url = config.url.rstrip("/") if config.url else None
     project.sonarqube_project_key = config.project_key or None
@@ -201,10 +197,7 @@ async def remove_sonarqube(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Disconnect SonarQube from a project (clears URL, key, token)."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
     project.sonarqube_url = None
     project.sonarqube_project_key = None
     project.sonarqube_token = None
@@ -218,10 +211,7 @@ async def test_sonarqube(
     current_user: User = Depends(get_current_user),
 ):
     """Test the configured SonarQube connection (auth + ping)."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
     if not project.sonarqube_url:
         raise HTTPException(status_code=400, detail="SonarQube URL not configured")
 
@@ -239,10 +229,7 @@ async def sync_sonarqube(
     current_user: User = Depends(require_role("security_engineer")),
 ):
     """Queue a celery task to pull the latest SonarQube issues for the project."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_project_for_user(db, project_id, current_user)
     if not project.sonarqube_url or not project.sonarqube_project_key:
         raise HTTPException(status_code=400, detail="SonarQube URL and project key are required")
 

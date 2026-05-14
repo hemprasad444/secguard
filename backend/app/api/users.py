@@ -14,6 +14,24 @@ from app.schemas.user import UserResponse, UserUpdate, AdminCreateUser, AdminCre
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+async def _get_user_in_org(
+    db: AsyncSession, user_id: UUID, current_user: User
+) -> User:
+    """Fetch a user by id, scoped to the caller's organization.
+
+    Returns 404 (not 403) for cross-org access to avoid confirming the
+    existence of users in other organizations.
+    """
+    query = select(User).where(User.id == user_id)
+    if current_user.org_id is not None:
+        query = query.where(User.org_id == current_user.org_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+
 def _generate_temp_password(length: int = 14) -> str:
     """Letters + digits, guaranteed mix. Avoids ambiguous chars (O/0/I/l)."""
     alphabet = string.ascii_letters + string.digits
@@ -44,11 +62,7 @@ async def get_user(
     current_user: User = Depends(require_role("admin")),
 ):
     """Get a single user by ID. Requires admin role."""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
+    return await _get_user_in_org(db, user_id, current_user)
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
@@ -59,10 +73,7 @@ async def update_user(
     current_user: User = Depends(require_role("admin")),
 ):
     """Update a user (role, is_active, name). Requires admin role."""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user = await _get_user_in_org(db, user_id, current_user)
 
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -80,11 +91,7 @@ async def deactivate_user(
     current_user: User = Depends(require_role("admin")),
 ):
     """Deactivate a user (set is_active=False). Requires admin role."""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
+    user = await _get_user_in_org(db, user_id, current_user)
     user.is_active = False
     await db.commit()
 
@@ -131,10 +138,7 @@ async def admin_reset_password(
     current_user: User = Depends(require_role("admin")),
 ):
     """Generate a fresh temporary password and force the user to change it on next login."""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user = await _get_user_in_org(db, user_id, current_user)
 
     temp = _generate_temp_password()
     user.password_hash = hash_password(temp)
