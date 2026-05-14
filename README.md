@@ -60,34 +60,6 @@ new user.
 | ![Projects](docs/screenshots/projects.png) | ![My Tasks](docs/screenshots/my-tasks.png) |
 | ![Reports](docs/screenshots/reports.png) | ![Settings](docs/screenshots/settings.png) |
 
-## Architecture
-
-```
-                    +------------------+
-                    |    Frontend      |
-                    |  React + Vite    |
-                    |  (Nginx :8080)   |
-                    +--------+---------+
-                             |
-                    +--------+---------+
-                    |    Backend       |
-                    |  FastAPI :8000   |
-                    +--------+---------+
-                             |
-              +--------------+--------------+
-              |              |              |
-     +--------+----+  +-----+------+  +----+-------+
-     |  PostgreSQL  |  |   Redis    |  |   Celery   |
-     |   :5432      |  |   :6379   |  |   Worker   |
-     +-------------+  +-----------+  +-----+------+
-                                           |
-                              +------------+------------+
-                              |            |            |
-                        +-----+----+ +----+-----+ +----+-----+
-                        |  Trivy   | |Kubescape | | Semgrep  |
-                        +----------+ +----------+ +----------+
-```
-
 ## Quick Start
 
 ### Prerequisites
